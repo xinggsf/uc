@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name           autoPopup.uc.js
 // @description    Auto popup menulist/menupopup
+// @updateURL      https://github.com/xinggsf/uc/raw/master/autoPopup.uc.js
 // @compatibility  Firefox 34.0+
 // @author         GOLF-AT, modify by xinggsf
 // @version        2015.8.28
