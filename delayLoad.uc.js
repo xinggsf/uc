@@ -13,11 +13,14 @@ location == "chrome://browser/content/browser.xul" && (() => {
 	Cu.import("resource://gre/modules/AddonManager.jsm");
 
 	function toggleDelay(disable) {
-		//{d10d0bf8-f5b5-c8b4-a8b2-2b9879e08c5d} ABP
-		['{fe272bd1-5f76-4ea4-8501-a05d35d823fc}',//ABE
-		 'firebug@software.joehewitt.com'
-		].forEach(id => AddonManager.getAddonByID(id, 
-			addon => addon.userDisabled = disable));
+		let id,
+		a = [
+			'{fe272bd1-5f76-4ea4-8501-a05d35d823fc}',//ABE
+			//{d10d0bf8-f5b5-c8b4-a8b2-2b9879e08c5d}, ABP
+			//'firebug@software.joehewitt.com'
+		];
+		for(id of a) AddonManager.getAddonByID(id, 
+			addon => addon.userDisabled = disable);
 	}
 
 	//启用 延迟加载扩展

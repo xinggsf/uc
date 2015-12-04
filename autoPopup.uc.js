@@ -8,7 +8,7 @@
 // ==UserScript==
 
 -function (doc) {
-	let nDelay = 360;
+	let nDelay = 310;
 	let overElt = null;
 	let popElt = null;
 	let popTimer = null;
@@ -16,10 +16,11 @@
 	let searchBar = null;
 	let alwaysPop = false;
 
-	//by xinggsf,æ”¯æŒFxçš„CSSæ‰€æœ‰è¯­æ³•: #è¡¨ç¤ºidï¼Œ. è¡¨ç¤ºclassï¼Œæˆ–[id='demo']
-	let blackIDs = [];
+	//by xinggsf,Ö§³ÖFxµÄCSSËùÓÐÓï·¨: #±íÊ¾id£¬. ±íÊ¾class£¬»ò[id='demo']
+	//Îª¼òµ¥Æð¼û£¬Ö»Ö§³ÖclassName
+	let blackIDs = ['bookmark-item'];
 
-	//by xinggsf, ç™½åå•ï¼ŒåŠè§¦å‘åŠ¨ä½œ
+	//by xinggsf, °×Ãûµ¥£¬¼°´¥·¢¶¯×÷
 	let whiteIDs = [{
 		id: 'omnibar-defaultEngine',
 		popMemu: 'omnibar-engine-menu',
@@ -103,7 +104,13 @@
 	}
 
 	function isBlackNode(elt) {
-		return blackIDs.some(css => css.length && doc.querySelector(css));
+/* 		let c, p = elt.parentNode;
+		return blackIDs.some(css => {
+			if (!css.length) return !1;
+			c = p.querySelectorAll(css);
+			return c.length && blackIDs.some.call(c, e => e===elt);
+		}); */
+		return blackIDs.some(s => elt.classList.contains(s));
 	}
 
 	function getPopupPos(elt) {
@@ -249,10 +256,12 @@
 	}
 
 	function mouseOver(e) {
-		if (!alwaysPop && !doc.hasFocus())
+		if (!alwaysPop && !doc.hasFocus()) {
+			popElt && hidePopup();
 			return;
+		}
 		let popNode, n = e.originalTarget;
-		//xinggsfï¼šæ•°ç»„éåŽ†æ–¹æ³•æŽ¥å—ç¬¬äºŒä¸ªå‚æ•°ï¼Œè¡¨ä½œç”¨åŸŸthisï¼Œæ— é¡»call
+		//xinggsf£ºÊý×é±éÀú·½·¨½ÓÊÜµÚ¶þ¸ö²ÎÊý£¬±í×÷ÓÃÓòthis£¬µ«²»ÄÜÌæ´úcall
 		whitesInx = n.hasAttribute('id') ?
 			whiteIDs.findIndex(k => k.id === n.id) : -1;
 		if (whitesInx > -1) {
