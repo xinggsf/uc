@@ -3,18 +3,21 @@
 // @description    Auto popup menulist/menupopup
 // @updateURL      https://github.com/xinggsf/uc/raw/master/autoPopup.uc.js
 // @compatibility  Firefox 34.0+
-// @author         GOLF-AT, modify by xinggsf
-// @version        2015.8.28
-// ==UserScript==
+// @author         GOLF-AT, xinggsf
+// @version        2015.12.10
+//以下所注释内容由xinggsf改进
+// @note           2015.12.10使用setter函数监控变量，防止弹出多个菜单;新增多个omnibar内的图标白名单
+// @note           2015.11.8取消书签的自动弹出，因为我的任务栏也是左竖栏
+// @note           2015.8.8增加白名单功能，用之处理多个omnibar内的图标
+// ==/UserScript==
 
 -function (doc) {
-	let nDelay = 310;
-	let overElt = null;
+	let nDelay = 230;
+	let _overElt = null;
 	let popElt = null;
 	let popTimer = null;
 	let hideTimer = null;
 	let searchBar = null;
-	let alwaysPop = false;
 
 	//by xinggsf,支持Fx的CSS所有语法: #表示id，. 表示class，或[id='demo']
 	//为简单起见，只支持className
@@ -22,6 +25,7 @@
 
 	//by xinggsf, 白名单，及触发动作
 	let whiteIDs = [{
+	//放在omnibar中的搜索引擎图标，但其与弹出菜单并不关联，故得写函数
 		id: 'omnibar-defaultEngine',
 		popMemu: 'omnibar-engine-menu',
 		run: function(overElem){
@@ -29,15 +33,33 @@
 		}
 	},
 	{
+		id: 'SimpleMusicPlayer',
+		popMemu: 'SimpleMusicPlayer-popup',
+		run: null
+	},
+	{//弹出页面信息窗口
+		id: 'verticaltoolbar-page-info-button',
+		run: function(overElem){
+			BrowserPageInfo();
+		}
+	},
+	{
+		id: 'uAutoPagerize-icon',
+		popMemu: 'uAutoPagerize-popup',
+	},
+	{
+		id: 'redirector-icon',
+		popMemu: 'redirector-menupopup',
+		//function(overElem){Redirector.iconClick(); }
+	},
+	{
 		id: 'readLater',
 		popMemu: 'readLater-popup',
-		run: null
 		//function(overElem){ popElt.popup();}
 	},
 	{
 		id: 'foxyproxy-toolbar-icon',
 		popMemu: 'foxyproxy-toolbarbutton-popup',
-		run: null
 	}];
 	let whitesInx = -1;
 
@@ -104,7 +126,8 @@
 	}
 
 	function isBlackNode(elt) {
-/* 		let c, p = elt.parentNode;
+	/*此段注释代码为CSS黑名单支持实现，可恢复，并注释其后一行。
+ 		let c, p = elt.parentNode;
 		return blackIDs.some(css => {
 			if (!css.length) return !1;
 			c = p.querySelectorAll(css);
@@ -198,11 +221,13 @@
 		popTimer = null;
 		if (!overElt) return;
 
+		_hidePopup();
+
 		if (whitesInx > -1 && popElt && whiteIDs[whitesInx].run) {
 			whiteIDs[whitesInx].run(overElt);
 			return;
 		}
-		!popElt && (popElt = overElt);
+		if (!popElt) popElt = overElt;
 
 		if (overElt.localName == 'dropmarker')
 			popElt.showPopup();
@@ -234,7 +259,7 @@
 		}
 	}
 
-	function hidePopup() {
+	function _hidePopup() {
 		try {
 			if (overElt.localName == 'dropmarker')
 				popElt.parentNode.closePopup();
@@ -247,16 +272,20 @@
 				popElt.hidePopup();
 			else if (popElt.popupBoxObject)
 				popElt.popupBoxObject.hidePopup();
-			 else if (isSearchBtn(overElt))
+			else if (isSearchBtn(overElt))
 				 searchBar.textbox.closePopup();
-		} catch (e) {}
+		}
+		catch (e) {}
+		finally {hideTimer = null;}
+	}
 
-		hideTimer = null;
+	function hidePopup() {
+		_hidePopup();
 		overElt = popElt = null;
 	}
 
 	function mouseOver(e) {
-		if (!alwaysPop && !doc.hasFocus()) {
+		if (!doc.hasFocus()) {
 			popElt && hidePopup();
 			return;
 		}
@@ -266,7 +295,8 @@
 			whiteIDs.findIndex(k => k.id === n.id) : -1;
 		if (whitesInx > -1) {
 			overElt = n;
-			popElt = doc.getElementById(whiteIDs[whitesInx].popMemu);
+			if (whiteIDs[whitesInx].popMemu)
+				popElt = doc.getElementById(whiteIDs[whitesInx].popMemu);
 			popTimer = setTimeout(autoPopup, nDelay);
 			return;
 		}
@@ -322,6 +352,14 @@
 			|| (IsButton(elt) && getPopupMenu(elt));
 	}
 
+    this.__defineGetter__("overElt", function(){
+        return _overElt;
+    });
+    this.__defineSetter__("overElt", function(x){
+        if (_overElt) _hidePopup();
+		_overElt = x;
+    });
 	searchBar = BrowserSearch.SearchBar;
 	window.addEventListener('mouseover', mouseOver, false);
+	window.addEventListener('blur', hidePopup, false);
 }(document);
