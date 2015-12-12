@@ -4,22 +4,22 @@
 // @updateURL      https://github.com/xinggsf/uc/raw/master/autoPopup.uc.js
 // @compatibility  Firefox 34.0+
 // @author         GOLF-AT, xinggsf
-// @version        2015.12.10
+// @version        2015.12.13
 //以下所注释内容由xinggsf改进
 // @note           2015.12.10使用setter函数监控变量，防止弹出多个菜单;新增多个omnibar内的图标白名单
 // @note           2015.11.8取消书签的自动弹出，因为我的任务栏也是左竖栏
-// @note           2015.8.8增加白名单功能，用之处理多个omnibar内的图标
+// @note           2015.8.8增加白名单功能，用之处理omnibar内的多个图标
 // ==/UserScript==
 
 -function (doc) {
-	let nDelay = 230;
+	let nDelay = 290;
 	let _overElt = null;
 	let popElt = null;
 	let popTimer = null;
 	let hideTimer = null;
 	let searchBar = null;
 
-	//by xinggsf,支持Fx的CSS所有语法: #表示id，. 表示class，或[id='demo']
+	//by xinggsf,支持Fx的CSS所有语法: #表示id，. 表示class
 	//为简单起见，只支持className
 	let blackIDs = ['bookmark-item'];
 
@@ -281,16 +281,15 @@
 
 	function hidePopup() {
 		_hidePopup();
-		overElt = popElt = null;
+		_overElt = popElt = null;
 	}
 
 	function mouseOver(e) {
 		if (!doc.hasFocus()) {
-			popElt && hidePopup();
+			_overElt && hidePopup();
 			return;
 		}
 		let popNode, n = e.originalTarget;
-		//xinggsf：数组遍历方法接受第二个参数，表作用域this，但不能替代call
 		whitesInx = n.hasAttribute('id') ?
 			whiteIDs.findIndex(k => k.id === n.id) : -1;
 		if (whitesInx > -1) {
@@ -356,10 +355,11 @@
         return _overElt;
     });
     this.__defineSetter__("overElt", function(x){
-        if (_overElt) _hidePopup();
+        if (x === _overElt) return;
+		if (_overElt) _hidePopup();
 		_overElt = x;
     });
 	searchBar = BrowserSearch.SearchBar;
 	window.addEventListener('mouseover', mouseOver, false);
-	window.addEventListener('blur', hidePopup, false);
+	//window.addEventListener('blur', hidePopup, false);
 }(document);
