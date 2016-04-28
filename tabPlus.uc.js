@@ -7,6 +7,7 @@
 // @include chrome://browser/content/bookmarks/bookmarksPanel.xul
 // @include chrome://browser/content/history/history-panel.xul
 // @include chrome://browser/content/places/places.xul
+// @Note xinggsf 2015.12.18 增加右击新建按钮新开剪贴板中的网址
 // @Note xinggsf 2015.1.28 整合，并去掉经常产生BUG的地址栏输入新开功能
 // @Note 2014.09.18 最后一次修正整合 by defpt
 // ==/UserScript==
@@ -43,9 +44,23 @@ try {
 eval("gBrowser._blurTab = " + gBrowser._blurTab.toString().replace('this.selectedTab = tab;', "this.selectedTab = aTab.previousSibling? aTab.previousSibling : tab;"));
 }catch(e){};
 
+//右键点击新建按钮打开剪贴板中的网址
+location=="chrome://browser/content/browser.xul" &&
+window.addEventListener("click", function(e) {
+	if (e.button === 2 && e.originalTarget.className === "tabs-newtab-button") {
+		let url = readFromClipboard();
+		//原正则 /^(https?:\/\/)?\w+(\.\w+)+\/\S*/
+		if (!/^(https?:\/\/)?([\w\-]+\.)+\w+/.test(url))
+			url = 'https://www.baidu.com/s?wd='+ encodeURIComponent(url);
+		gBrowser.loadOneTab(url, {inBackground:false});
+		e.preventDefault();
+		e.stopPropagation();
+	}
+}, false);
+
 //鼠标停留标签自动聚焦
-(document.getElementById("tabbrowser-tabs") || gBrowser.mTabBox).addEventListener('mouseover',
- function onMouseOver(e) {
+(document.getElementById("tabbrowser-tabs") || gBrowser.mTabBox)
+.addEventListener('mouseover', function onMouseOver(e) {
 	if ((onMouseOver.target = e.target).localName === 'tab') {
 		if (!onMouseOver.timeoutID) {
 			 this.addEventListener('mouseout', function(){
@@ -56,8 +71,8 @@ eval("gBrowser._blurTab = " + gBrowser._blurTab.toString().replace('this.selecte
 			gBrowser.selectedTab = onMouseOver.target;
 		 }, 230);
 	 }
- }, false);
-	 
+}, false);
+
 //自动关闭下载产生的空白标签
 eval("gBrowser.mTabProgressListener = " + gBrowser.mTabProgressListener.toString().replace(/(?=var location)/, '\
 if (aWebProgress.DOMWindow.document.documentURI == "about:blank"\

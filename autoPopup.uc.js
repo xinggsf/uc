@@ -1,14 +1,17 @@
 // ==UserScript==
 // @name           autoPopup.uc.js
 // @description    Auto popup menulist/menupopup
-// @updateURL      https://github.com/xinggsf/uc/raw/master/autoPopup.uc.js
+// @updateURL      https://raw.githubusercontent.com/xinggsf/uc/master/autoPopup.uc.js
+// @namespace      autoPopup@gmail.com
+// @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 34.0+
 // @author         GOLF-AT, xinggsf
-// @version        2015.12.13
-//ÒÔÏÂËù×¢ÊÍÄÚÈÝÓÉxinggsf¸Ä½ø
-// @note           2015.12.10Ê¹ÓÃsetterº¯Êý¼à¿Ø±äÁ¿£¬·ÀÖ¹µ¯³ö¶à¸ö²Ëµ¥;ÐÂÔö¶à¸öomnibarÄÚµÄÍ¼±ê°×Ãûµ¥
-// @note           2015.11.8È¡ÏûÊéÇ©µÄ×Ô¶¯µ¯³ö£¬ÒòÎªÎÒµÄÈÎÎñÀ¸Ò²ÊÇ×óÊúÀ¸
-// @note           2015.8.8Ôö¼Ó°×Ãûµ¥¹¦ÄÜ£¬ÓÃÖ®´¦ÀíomnibarÄÚµÄ¶à¸öÍ¼±ê
+// @version        2016.4.27
+//ä»¥ä¸‹æ‰€æ³¨é‡Šå†…å®¹ç”±xinggsfæ”¹è¿›
+// @note           2016.1.2é™å®šè„šæœ¬ä½œç”¨åœ¨FXå†…éƒ¨
+// @note           2015.12.10ç”¨setteræŽ§åˆ¶ï¼Œé˜²æ­¢å¼¹å‡ºå¤šä¸ªèœå•;æ–°å¢žå¤šä¸ªomnibarå†…çš„å›¾æ ‡ç™½åå•
+// @note           2015.11.8å–æ¶ˆä¹¦ç­¾çš„è‡ªåŠ¨å¼¹å‡ºï¼Œå› ä¸ºæˆ‘çš„ä»»åŠ¡æ ä¹Ÿæ˜¯å·¦ç«–æ 
+// @note           2015.8.8å¢žåŠ ç™½åå•åŠŸèƒ½ï¼Œç”¨ä¹‹å¤„ç†omnibarå†…çš„å¤šä¸ªå›¾æ ‡
 // ==/UserScript==
 
 -function (doc) {
@@ -19,38 +22,32 @@
 	let hideTimer = null;
 	let searchBar = null;
 
-	//by xinggsf,Ö§³ÖFxµÄCSSËùÓÐÓï·¨: #±íÊ¾id£¬. ±íÊ¾class
-	//Îª¼òµ¥Æð¼û£¬Ö»Ö§³ÖclassName
-	let blackIDs = ['bookmark-item'];
+	//by xinggsf,æ”¯æŒFxçš„CSSæ‰€æœ‰è¯­æ³•: #è¡¨ç¤ºidï¼Œ. è¡¨ç¤ºclass
+	let blackIDs = ['.bookmark-item'];
 
-	//by xinggsf, °×Ãûµ¥£¬¼°´¥·¢¶¯×÷
+	//by xinggsf, ç™½åå•ï¼ŒåŠè§¦å‘åŠ¨ä½œ
 	let whiteIDs = [{
-	//·ÅÔÚomnibarÖÐµÄËÑË÷ÒýÇæÍ¼±ê£¬µ«ÆäÓëµ¯³ö²Ëµ¥²¢²»¹ØÁª£¬¹ÊµÃÐ´º¯Êý
+	//æ”¾åœ¨omnibarä¸­çš„æœç´¢å¼•æ“Žå›¾æ ‡
 		id: 'omnibar-defaultEngine',
 		popMemu: 'omnibar-engine-menu',
-		run: function(overElem){
-			doc.getElementById('omnibar-in-urlbar').click(0);
-		}
+		/*run: function(overElem){
+			$('omnibar-in-urlbar').click(0);
+		}*/
 	},
 	{
 		id: 'SimpleMusicPlayer',
 		popMemu: 'SimpleMusicPlayer-popup',
 		run: null
 	},
-	{//µ¯³öÒ³ÃæÐÅÏ¢´°¿Ú
-		id: 'verticaltoolbar-page-info-button',
-		run: function(overElem){
-			BrowserPageInfo();
-		}
-	},
 	{
 		id: 'uAutoPagerize-icon',
 		popMemu: 'uAutoPagerize-popup',
 	},
-	{
-		id: 'redirector-icon',
-		popMemu: 'redirector-menupopup',
-		//function(overElem){Redirector.iconClick(); }
+	{//å¼¹å‡ºé¡µé¢ä¿¡æ¯çª—å£
+		id: 'verticaltoolbar-page-info-button',
+		run: function(overElem){
+			BrowserPageInfo();
+		}
 	},
 	{
 		id: 'readLater',
@@ -63,16 +60,21 @@
 	}];
 	let whitesInx = -1;
 
-	let popupPos = ['after_start', 'end_before', 'before_start', 				'start_before'];
+	let popupPos = ['after_start', 'end_before', 'before_start', 'start_before'];
 
 	let menuPanelID = 'PanelUI-popup';
 	let downPanelID = 'downloadsPanel';
 	let widgetPanelID = 'customizationui-widget-panel';
 
+	let ppmContainer = $('mainPopupSet');
+	function $(id) {
+		return doc.getElementById(id);
+	}
+	
 	function isWidgetBtn(elt) {
 		try {
 			return elt.hasAttribute('widget-id')
-				&& elt.getAttribute('widget-type') == 'view';
+				&& elt.getAttribute('widget-type') === 'view';
 		} catch (e) {
 			return false;
 		}
@@ -113,27 +115,20 @@
 	}
 
 	function getPopupMenu(elt) {
-		if (whitesInx > -1 && popElt)
-			return popElt;
-		let nodes = elt ? elt.ownerDocument.getAnonymousNodes(elt) : null;
-		for (let k of nodes) {
-			if (k.localName == 'menupopup')
+		if (!elt) return null;
+		if (whitesInx > -1 && popElt) return popElt;
+		let s = elt.getAttribute('popup') || elt.getAttribute('context');
+		if (s) return $(s);
+		s = elt.ownerDocument.getAnonymousNodes(elt);
+		for (let k of s) {
+			if (k.localName === 'menupopup')
 				return k;
 		}
-
-		let s = elt.getAttribute('popup');
-		return s ? doc.getElementById(s) : null;
+		return null;
 	}
 
 	function isBlackNode(elt) {
-	/*´Ë¶Î×¢ÊÍ´úÂëÎªCSSºÚÃûµ¥Ö§³ÖÊµÏÖ£¬¿É»Ö¸´£¬²¢×¢ÊÍÆäºóÒ»ÐÐ¡£
- 		let c, p = elt.parentNode;
-		return blackIDs.some(css => {
-			if (!css.length) return !1;
-			c = p.querySelectorAll(css);
-			return c.length && blackIDs.some.call(c, e => e===elt);
-		}); */
-		return blackIDs.some(s => elt.classList.contains(s));
+		return blackIDs.some(css => elt.mozMatchesSelector(css));
 	}
 
 	function getPopupPos(elt) {
@@ -150,11 +145,9 @@
 				continue;
 			h = elt.boxObject.height;
 			w = elt.boxObject.width;
-			if (h >= 3 * w) {
-				if (h >= 45) {
-					pos = 9;
-					break;
-				}
+			if (h >= 45 && h >= 3 * w) {
+				pos = 9;
+				break;
 			} else if (w >= 45 && w >= 3 * h) {
 				pos = 8;
 				break;
@@ -163,7 +156,7 @@
 		try {
 			box = elt.boxObject;
 			x = (pos & 1) ? (x <= box.width / 2 + box.screenX ? 1 : 3) :
-							(y <= box.height / 2 + box.screenY ? 0 : 2);
+				(y <= box.height / 2 + box.screenY ? 0 : 2);
 		} catch (e) {
 			x = 0;
 		}
@@ -171,15 +164,15 @@
 	}
 
 	function getPopupNode(node) {
-		if (whitesInx > -1 && popElt)
+		if (whitesInx !== -1 && popElt)
 			return popElt;
-		let elt, isPop, s,
+		let elt, s,
+		isPop = !1, //Node isn't Popup node
 		r = /menupopup|popup|menulist/;
 
 		for (; node != null; node = node.parentNode) {
 			if (node == popElt) return node;
 
-			isPop = false; //Node isn't Popup node
 			s = node.localName;
 			if (r.test(s) || isAutoComplete(node) || IsMenuButton(node))
 				isPop = true;
@@ -208,23 +201,28 @@
 			}
 			if (isPop) break;
 		}
-		if (popElt && node) {
-			//Whether node is child of popElt
-			for (elt = node.parentNode; elt != null; elt = elt.parentNode) {
-				if (elt === popElt) return popElt;
-			}
-		}
+		if (popElt && node && popElt.contains(node))
+			return popElt;
 		return isPop ? node : null;
 	}
 
+	function popupMenu(btn, m) {
+		try {
+			let pos = getPopupPos(btn);
+			m.openPopup(btn, pos, 0, 0, false, false, null);
+		} catch (e) {}
+	}
 	function autoPopup() {
 		popTimer = null;
-		if (!overElt) return;
+		if (!_overElt) return;
 
 		_hidePopup();
 
-		if (whitesInx > -1 && popElt && whiteIDs[whitesInx].run) {
-			whiteIDs[whitesInx].run(overElt);
+		if (whitesInx > -1) {
+			if (whiteIDs[whitesInx].run)
+				whiteIDs[whitesInx].run(overElt);
+			else if (popElt)
+				popupMenu(overElt, popElt);
 			return;
 		}
 		if (!popElt) popElt = overElt;
@@ -235,27 +233,21 @@
 			overElt.open = true;
 		else if (isNewMenuBtn(overElt)) {
 			PanelUI.show();
-			popElt = doc.getElementById(menuPanelID);
+			popElt = $(menuPanelID);
 		} else if (isWidgetBtn(overElt)) {
 			let cmdEvent = doc.createEvent('xulcommandevent');
 			cmdEvent.initCommandEvent("command", true, true, window, 0, false,
 				false, false, false, null);
 			overElt.dispatchEvent(cmdEvent);
-			popElt = doc.getElementById(widgetPanelID);
+			popElt = $(widgetPanelID);
 		} else if (isDownloadBtn(overElt)) {
-			popElt = doc.getElementById(downPanelID);
+			popElt = $(downPanelID);
 			DownloadsPanel.showPanel();
 		} else if (isSearchBtn(overElt)) {
 			searchBar.openSuggestionsPanel();
-			//console.log('search click!');
 		} else {
 			popElt = getPopupMenu(overElt);
-			try {
-				let Pos = getPopupPos(overElt);
-				popElt.openPopup(overElt, Pos, 0, 0, false, false, null);
-			} catch (e) {
-				popElt = null;
-			}
+			popElt ? popupMenu(overElt, popElt) : overElt.click();
 		}
 	}
 
@@ -284,23 +276,29 @@
 		_overElt = popElt = null;
 	}
 
-	function mouseOver(e) {
+	function mouseOver(ev) {
 		if (!doc.hasFocus()) {
 			_overElt && hidePopup();
 			return;
 		}
-		let popNode, n = e.originalTarget;
-		whitesInx = n.hasAttribute('id') ?
-			whiteIDs.findIndex(k => k.id === n.id) : -1;
+		let popNode, e = ev.target;
+		//console.log(e.firstChild);		
+		if (e.closest('menupopup,menulist,popupset')) return;
+		//if ('menuitem' === e.nodeName) return;
+		//if (e.closest('#mainPopupSet')) return;//ppmContainer.contains(e)
+
+		whitesInx = e.hasAttribute('id') ?
+			whiteIDs.findIndex(k => k.id === e.id) : -1;
 		if (whitesInx > -1) {
-			overElt = n;
+			overElt = e;
 			if (whiteIDs[whitesInx].popMemu)
-				popElt = doc.getElementById(whiteIDs[whitesInx].popMemu);
+				popElt = $(whiteIDs[whitesInx].popMemu);
 			popTimer = setTimeout(autoPopup, nDelay);
 			return;
 		}
 
-		popNode = getPopupNode(n);
+		popNode = getPopupNode(e);
+		if (isAutoComplete(popNode)) return;
 		if (!popNode || (popNode && popNode.disabled) || isBlackNode(popNode)) {
 			mouseOut();
 			return;
@@ -310,20 +308,9 @@
 			window.clearTimeout(hideTimer);
 			hideTimer = null;
 		}
-		try {
-			if (isAutoComplete(popNode)) return;
 
-			let elt = popNode,
-			r = /menupopup|popup/;
-			for (;elt != null; elt = elt.parentNode) {
-				if (r.test(elt.localName)) return;
-			}
-		} catch (ex) {}
-
-		if (popElt && popNode == popElt && popElt != overElt)
-			return;
-		if (overElt && popNode != overElt)
-			hidePopup();
+		if (popElt && popNode == popElt && popElt != overElt) return;
+		if (overElt && popNode != overElt) hidePopup();
 		overElt = popNode;
 		popElt = null;
 		popTimer = setTimeout(autoPopup, nDelay);
@@ -361,5 +348,4 @@
     });
 	searchBar = BrowserSearch.SearchBar;
 	window.addEventListener('mouseover', mouseOver, false);
-	//window.addEventListener('blur', hidePopup, false);
 }(document);
