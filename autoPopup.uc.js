@@ -49,8 +49,6 @@ let whiteIDs = [{
 //let ppmContainer = $('mainPopupSet');
 
 class MenuAct {//菜单动作基类－抽象类
-	//btn = null;ES6不支持实例属性这样定义
-	//ppm = null;
 	constructor() {
 		if (new.target === MenuAct)
 			throw new Error('MenuAct类不能实例化');
@@ -66,10 +64,6 @@ class MenuAct {//菜单动作基类－抽象类
 		let s = e.getAttribute('context') || e.getAttribute('popup');
 		if (s) return $(s);
 		return e.querySelector('menupopup,menulist');
-		/* let r = /menupopup|menulist/,
-		c = e.ownerDocument.getAnonymousNodes(e);
-		for (let k of c)
-			if (r.test(k.nodeName)) return k; */
 	}
 	open(){
 		let m = this.ppm;
@@ -247,12 +241,6 @@ let btnManager = new class extends AutoPop {
 	}
 }();
 let ppmManager = new class extends AutoPop {//菜单管理
-	inMenu(e) {
-		let a = this.act;
-		this.isMenu = a && ((a.ppm && a.ppm.contains(e)) ||
-			e.closest('menupopup,menulist,popupset'));//',[type^=autocomplete],.autocomplete-history-dropmarker'
-		return this.isMenu;
-	}
 	clean() {
 		if (this.act) {
 			this.act.close();
@@ -265,35 +253,15 @@ let ppmManager = new class extends AutoPop {//菜单管理
 		}, nDelay);
 	}
 	mouseOver(e) {
-		if (this.inMenu(e) || (this.act && e === this.act.btn)) {
+		//',[type^=autocomplete],.autocomplete-history-dropmarker'
+		if (e.closest('menupopup,menulist,popupset') ||
+      (this.act && e === this.act.btn)) {
 			this.clearTimer();
 			return;
 		}
 		if (this.act) this.setTimer();
 	}
 }();
-
-function getPopupPos(elt) {
-	let box, w, h,
-	b = !1,
-	x = elt.boxObject.screenX,
-	y = elt.boxObject.screenY;
-
-	while (elt = elt.parentNode.closest('toolbar,hbox,vbox')) {
-		h = elt.boxObject.height;
-		w = elt.boxObject.width;
-		if (h >= 45 && h >= 3 * w) {
-			b = !0;
-			break;
-		}
-		if (w >= 45 && w >= 3 * h) break;
-	}
-	if (!elt) return 'after_start';
-	box = elt.boxObject;
-	x = b ? (x <= w / 2 + box.screenX ? 1 : 3) :
-			(y <= h / 2 + box.screenY ? 0 : 2);
-	return ['after_start','end_before','before_start','start_before'][x];
-}
 
 var prevElt = null;
 function mouseOver(ev) {
