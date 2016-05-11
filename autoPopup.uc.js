@@ -1,18 +1,16 @@
 // ==UserScript==
-// @name           autoPopup.uc.js
-// @description    Auto popup menulist/menupopup
+// @name           autoPopup++
+// @description    Auto popup/close menu/panel
 // @updateURL      https://raw.githubusercontent.com/xinggsf/uc/master/autoPopup.uc.js
-// @namespace      autoPopup@gmail.com
+// @namespace      autoPopup-plus.xinggsf
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
 // @author         xinggsf
-// @version        2016.5.8
-// 以下所注释内容由xinggsf改进
-// @note           2016.5.8 OOP封装：以清晰、简单的逻辑，真正实现定时自动弹出和关闭菜单
-// @note           2016.1.2限定脚本作用在FX内部
-// @note           2015.12.10用setter控制，防止弹出多个菜单;新增多个omnibar内的图标白名单
-// @note           2015.11.8取消书签的自动弹出，因为我的任务栏也是左竖栏
-// @note           2015.8.8增加白名单功能，用之处理omnibar内的多个图标
+// @version        2016.5.11
+// @note  2016.5.11  fix:在定制窗取消搜索框后脚本失效；撤消按钮菜单不能自动隐藏
+// @note  2016.5.10  修正原始搜索框图标按钮自动菜单
+// @note  2016.5.9   增加对firefox英文版的支持。fix bug: widget按钮的菜单不能自动隐藏；有时不能自动弹出菜单；菜单之右键菜单导致误隐藏！
+// @note  2016.5.8   OOP封装：以清晰、简单的逻辑，真正实现自动弹出和关闭菜单
 // ==/UserScript==
 
 function clone(src){//浅克隆
@@ -32,28 +30,47 @@ function clone(src){//浅克隆
 function $(id) {
 	return document.getElementById(id);
 }
-const nDelay = 260,
-//禁止自动弹出。CSS语法: #表示id，. 表示class
+function getPopupPos(elt) {
+	let box, w, h, b = !1,
+	x = elt.boxObject.screenX,
+	y = elt.boxObject.screenY;
+
+	while (elt = elt.parentNode.closest('toolbar,hbox,vbox')) {
+		h = elt.boxObject.height;
+		w = elt.boxObject.width;
+		if (h >= 45 && h >= 3 * w) {
+			b = !0;
+			break;
+		}
+		if (w >= 45 && w >= 3 * h) break;
+	}
+	if (!elt) return ppmPos[0];
+	box = elt.boxObject;
+	x = b ? (x <= w / 2 + box.screenX ? 1 : 3) :
+			(y <= h / 2 + box.screenY ? 0 : 2);
+	return ppmPos[x];
+}
+const nDelay = 290,
+ppmPos = ['after_start','end_before','before_start','start_before'],
+//禁止自动弹出的(按钮)黑名单。CSS语法: #表示id  .表示class
 blackIDs = ['#back-button','#forward-button'];//'.bookmark-item',
 //by xinggsf, 白名单，及触发动作
 let whiteIDs = [{
-//放在omnibar中的搜索引擎图标
-	id: 'omnibar-defaultEngine',
-	popMemu: 'omnibar-engine-menu',
-	//run: overEle => $('omnibar-in-urlbar').click(0)
-}, {
-	id: 'ublock0-button',
-	popMemu: 'ublock0-panel',
-	run: overEle => overEle.click()
+	//放在omnibar中的搜索引擎图标
+	id: 'omnibar-defaultEngine',//设定按钮ID
+	popMenu: 'omnibar-engine-menu',//设定菜单ID
+	run: btn => $('omnibar-in-urlbar').click()
+},{
+	id: 'alertbox_tb_action',
+	popMenu: 'alertbox_menu_panel',
 }];
-//let ppmContainer = $('mainPopupSet');
 
 class MenuAct {//菜单动作基类－抽象类
 	constructor() {
 		if (new.target === MenuAct)
 			throw new Error('MenuAct类不能实例化');
 	}
-	isButton(e) {//_isButton的装饰方法
+	isButton(e) {
 		let r = this._isButton(e);
 		if (!r) return r;
 		this.btn = e;
@@ -67,14 +84,14 @@ class MenuAct {//菜单动作基类－抽象类
 	}
 	open(){
 		let m = this.ppm;
+		//console.log(m);
 		if (m) {
 			if (m.openPopup)
-				m.openPopup(this.btn, null, 15, 15);
+				m.openPopup(this.btn, getPopupPos(this.btn));
 			else if (m.showPopup)
 				m.showPopup();
 			else if (m.popupBoxObject)
 				m.popupBoxObject.showPopup();
-			else this.btn.click();
 		}
 		else this.btn.click();
 	}
@@ -84,10 +101,12 @@ class MenuAct {//菜单动作基类－抽象类
 				this.ppm.hidePopup();
 			else if (this.ppm.popupBoxObject)
 				this.ppm.popupBoxObject.hidePopup();
+			else if (this.btn.closePopup)
+				this.btn.closePopup();
 		}
 	}
 }
-let menuActContainer = [
+let btnSearch, menuActContainer = [
 	new class extends MenuAct{//处理白名单
 		_isButton(e) {
 			this.idx = e.hasAttribute('id') ?
@@ -95,8 +114,8 @@ let menuActContainer = [
 			return this.idx !== -1;
 		}
 		getPopupMenu(e) {
-			let id = whiteIDs[this.idx].popMemu;
-			return id ? $(id) : super.getPopupMenu(e);
+			let id = whiteIDs[this.idx].popMenu;
+			return (id && $(id)) || super.getPopupMenu(e);
 		}
 		open() {
 			let fn = whiteIDs[this.idx].run;
@@ -107,18 +126,7 @@ let menuActContainer = [
 		_isButton(e) {
 			return blackIDs.some(css => e.mozMatchesSelector(css));//matches
 		}
-		open() {}//弹出动作为空从而禁止自动弹出，但可定时关闭菜单
-	}(),
-	new class extends MenuAct{
-		_isButton(e) {
-			return e.localName === 'dropmarker';
-		}
-		close() {
-			this.ppm.parentNode.closePopup();
-		}
-		open() {
-			this.ppm.showPopup();
-		}
+		open() {}
 	}(),
 	new class extends MenuAct{
 		_isButton(e) {
@@ -164,42 +172,53 @@ let menuActContainer = [
 	}(),
 	new class extends MenuAct{
 		_isButton(e) {
-			return e.hasAttribute('widget-id') &&
-				e.getAttribute('widget-type') === 'view';
+			return e.matches('[widget-id][widget-type=view]');
 		}
 		open() {
 			this.btn.click();
+			this.ppm = $('customizationui-widget-panel'); //'#nav-bar>panel[id$=-widget-panel]'
 		}
+		getPopupMenu(e) {return null;}
 	}(),
 	new class extends MenuAct{
 		_isButton(e) {
-			return e.getAttribute("anonid") === 'searchbar-search-button';
-		}
-		close() {
-			BrowserSearch.SearchBar.textbox.closePopup();
+			return e.matches('[widget-id][widget-type=button]');
 		}
 		open() {
-			BrowserSearch.SearchBar.openSuggestionsPanel();
+			super.open();
+			this.ppm = $('customizationui-widget-panel');
 		}
 	}(),
 	new class extends MenuAct{
 		_isButton(e) {
-			return /toolbarbutton|button/.test(e.localName) &&
-				this.getPopupMenu(e);;
+			if (!e.closest('#searchbar')) return !1;
+			let x = btnSearch.boxObject;
+			x = x.screenX + x.width;
+			return scrX < x;
+		}
+		getPopupMenu(e) {
+			return $('PopupSearchAutoComplete');
+		}
+		close() {
+			BrowserSearch.searchBar.textbox.closePopup();
+		}
+		open() {
+			BrowserSearch.searchBar.openSuggestionsPanel();
 		}
 	}(),
 	new class extends MenuAct{
 		_isButton(e) {
-			try {
-				return e.closest('toolbar') &&
-				('image' === e.nodeName || e.src.startsWith('data:image')) &&
-				this.getPopupMenu(e);
-			} catch (ex) {
-				return false;
-			}
+			return /toolbarbutton|button/.test(e.localName) && this.getPopupMenu(e);
+		}
+	}(),
+	new class extends MenuAct{
+		_isButton(e) {
+			return e.closest('toolbar') && this.getPopupMenu(e) &&
+			('image' === e.nodeName || e.matches('[src^="data:image"]'));
 		}
 	}(),
 ];
+let btnManager, ppmManager;
 class AutoPop {
 	constructor() {
 		this.timer = 0;
@@ -216,20 +235,27 @@ class AutoPop {
 		this.clearTimer();
 		this.act = null;
 	}
+	inMenu(e) {
+		let s = e.ownerDocument.URL;
+		if (!s.startsWith('chrome://')) return !1;
+		if (e.nodeName === 'menuitem') return !0;
+		let a = ppmManager.act;
+		if (!a || !a.ppm) return !1;
+		return e === a.btn || a.ppm.contains(e) || s.endsWith('/popup.html');
+	}
 }
-let btnManager = new class extends AutoPop {
+btnManager = new class extends AutoPop {
 	setTimer() {
 		this.timer = setTimeout(() => {
 			this.act.open();
 			ppmManager.clean();
 			ppmManager.act = clone(this.act);
 			this.clean();
-		}, nDelay);
+		}, nDelay +9);
 	}
 	mouseOver(e) {
 		this.clean();
-		//',[type^=autocomplete],.autocomplete-history-dropmarker'
-		if (e.closest('menupopup,menulist,popupset') || e.disabled)
+		if (this.inMenu(e) || e.disabled)
 			return;
 		for (let k of menuActContainer) {
 			if (k.isButton(e)) {
@@ -240,22 +266,20 @@ let btnManager = new class extends AutoPop {
 		}
 	}
 }();
-let ppmManager = new class extends AutoPop {//菜单管理
+ppmManager = new class extends AutoPop {
 	clean() {
 		if (this.act) {
 			this.act.close();
 			super.clean();
 		}
 	}
-	setTimer() {//定时器司职关闭菜单
+	setTimer() {
 		if (!this.timer) this.timer = setTimeout(() => {
 			this.clean();
 		}, nDelay);
 	}
 	mouseOver(e) {
-		//',[type^=autocomplete],.autocomplete-history-dropmarker'
-		if (e.closest('menupopup,menulist,popupset') ||
-      (this.act && e === this.act.btn)) {
+		if (this.inMenu(e)) {
 			this.clearTimer();
 			return;
 		}
@@ -263,17 +287,23 @@ let ppmManager = new class extends AutoPop {//菜单管理
 	}
 }();
 
-var prevElt = null;
+let scrX, prevElt = null;
 function mouseOver(ev) {
 	if (!document.hasFocus()) {
 		ppmManager.clean();
 		return;
 	}
-	let elt = ev.target;
-	if (elt === prevElt) return;
-	prevElt = elt;
-	btnManager.mouseOver(elt);
-	ppmManager.mouseOver(elt);
+	let e = ev.target;
+	if (e === prevElt) return;
+	prevElt = e;
+	scrX = ev.screenX;
+	btnManager.mouseOver(e);
+	ppmManager.mouseOver(e);
 }
 
-window.addEventListener('mouseover', mouseOver, false);
+if (!BrowserSearch.searchBar || $('omnibar-defaultEngine'))
+	menuActContainer.splice(-3, 1);
+else
+	btnSearch = BrowserSearch.searchBar.textbox
+	.querySelector('[anonid=searchbar-search-button]');
+window.addEventListener('mouseover', mouseOver, !1);
