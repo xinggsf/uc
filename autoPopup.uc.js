@@ -2,21 +2,19 @@
 // @name           autoPopup++
 // @description    Auto popup/close menu/panel
 // @updateURL      https://raw.githubusercontent.com/xinggsf/uc/master/autoPopup.uc.js
+// @homeURL      http://bbs.kafan.cn/thread-1866855-1-1.html
 // @namespace      autoPopup-plus.xinggsf
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
 // @author         xinggsf
-// @version        2016.5.13
+// @version        2016.5.15
+// @note  2016.5.14  更精确的菜单内判断； 将菜单打开后才能取得菜单DOM的动作隐性放到mouseover事件
 // @note  2016.5.13  新增本地配置文件_autoPopup.js; 增加对扩展页、历史记录窗、F12窗口的菜单支持
 // @note  2016.5.11  fix:在定制窗取消搜索框后脚本失效；撤消按钮菜单不能自动隐藏
 // @note  2016.5.10  修正原始搜索框图标按钮自动菜单
 // @note  2016.5.9   增加对firefox英文版的支持。fix bug: widget按钮的菜单不能自动隐藏；有时不能自动弹出菜单；菜单之右键菜单导致误隐藏！
 // @note  2016.5.8   OOP封装：以清晰、简单的逻辑，真正实现自动弹出和关闭菜单
 // ==/UserScript==
-
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-//Cu.import("resource://gre/modules/Services.jsm");
-//Cu.import("resource://gre/modules/NetUtil.jsm");
 
 function clone(src){//浅克隆
 	if (!src) return src;
@@ -59,7 +57,7 @@ function getPopupPos(elt) {
 	return ppmPos[x];
 }
 let nDelay, blackIDs, whiteIDs;
-function loadList() {
+function loadUserSet() {
 	let aFile = FileUtils.getFile("UChrm", setFile, false);
 	if (!aFile.exists() || !aFile.isFile()) return;
 	let fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
@@ -74,21 +72,17 @@ function loadList() {
 	fstream.close();
 	if (data) eval(data);
 }
-loadList();
+loadUserSet();
 
-class MenuAct {//菜单动作基类－抽象类
+class MenuAct {//菜单动作基类
 	constructor(btnCSS = '', menuId = '') {
-		if (new.target === MenuAct)
-			throw new Error('MenuAct类不能实例化');
 		this.btnCSS = btnCSS;
 		this.menuId = menuId;
 	}
 	isButton(e) {
-		let r = this.btnCSS ? e.matches(this.btnCSS) : this._isButton(e);
-		if (!r) return r;
+		this._ppm = 0;
 		this.btn = e;
-		this.ppm = this.getPopupMenu(e);
-		return r;
+		return this.btnCSS ? e.matches(this.btnCSS) : this._isButton(e);
 	}
 	getPopupMenu(e) {
 		if (this.menuId) return $(this.menuId);
@@ -96,11 +90,11 @@ class MenuAct {//菜单动作基类－抽象类
 		if (s) return $(s);
 		return e.querySelector('menupopup,menulist');
 	}
-	open(){
-		this._open();
-		if (this.afterOpen) this.afterOpen();
+	get ppm() {
+		if (!this._ppm) this._ppm = this.getPopupMenu(this.btn);
+		return this._ppm;
 	}
-	_open(){
+	open(){
 		let m = this.ppm;
 		//console.log(m);
 		if (m) {
@@ -124,31 +118,27 @@ class MenuAct {//菜单动作基类－抽象类
 		}
 	}
 }
-class widgetPanelAct extends MenuAct {
-	afterOpen() {
-		this.ppm = $('customizationui-widget-panel');//'#nav-bar>panel[id$=-widget-panel]'
-		//console.log(this.ppm.firstChild.loadframe);
-	}
-}
+const idWidgetPanel = 'customizationui-widget-panel';
 let btnSearch, menuActContainer = [
 	new class extends MenuAct{//处理白名单
 		_isButton(e) {
-			this.idx = e.hasAttribute('id') ?
-				whiteIDs.findIndex(k => k.id === e.id) : -1;
-			return this.idx !== -1;
+			if (!e.hasAttribute('id')) return !1;
+			let id = e.id;
+			this.item = whiteIDs.find(k => k.id === id);
+			return !!this.item;
 		}
 		getPopupMenu(e) {
-			let id = whiteIDs[this.idx].popMenu;
+			let id = this.item.popMenu;
 			return (id && $(id)) || super.getPopupMenu(e);
 		}
 		open() {
-			let fn = whiteIDs[this.idx].run;
+			let fn = this.item.run;
 			fn ? fn(this.btn) : super.open();
 		}
 	}(),
 	new class extends MenuAct{//处理黑名单
 		_isButton(e) {
-			return blackIDs.some(css => e.mozMatchesSelector(css));//matches
+			return blackIDs.some(css => e.mozMatchesSelector(css));
 		}
 		open() {}
 	}(),
@@ -187,10 +177,7 @@ let btnSearch, menuActContainer = [
 			DownloadsPanel.showPanel();
 		}
 	}('#downloads-button','downloadsPanel'),
-	new class extends widgetPanelAct{
-		getPopupMenu(e) {return null;}
-	}('[widget-id][widget-type=view]'),
-	new widgetPanelAct('[widget-id][widget-type=button]'),
+	new MenuAct('[widget-id][widget-type]',idWidgetPanel),
 	new class extends MenuAct{
 		_isButton(e) {
 			if (!e.closest('#searchbar')) return !1;
@@ -207,17 +194,17 @@ let btnSearch, menuActContainer = [
 	}('','PopupSearchAutoComplete'),
 	new class extends MenuAct{
 		_isButton(e) {
-			return /toolbarbutton|button/.test(e.localName) && this.getPopupMenu(e);
+			return /toolbarbutton|button/.test(e.localName) && this.ppm;
 		}
 	}(),
 	new class extends MenuAct{
 		_isButton(e) {
-			return e.closest('toolbar') && this.getPopupMenu(e) &&
+			return e.closest('toolbar') && this.ppm &&
 			('image' === e.nodeName || e.matches('[src^="data:image"]'));
 		}
 	}(),
 ];
-let btnManager, ppmManager;
+let btnManager, ppmManager, _inMenu;
 class AutoPop {
 	constructor() {
 		this.timer = 0;
@@ -237,13 +224,14 @@ class AutoPop {
 	inMenu(e) {
 		let a = ppmManager.act;
 		if (!a || !a.ppm) return !1;
-		if (e.nodeName === 'menuitem' || e === a.btn || a.ppm.contains(e))
+		if (e.nodeName === 'menuitem' || e === a.btn || a.ppm.contains(e) ||
+			e.closest('popupset'))
 			return !0;
-		// console.log(d.commandDispatcher.focusedWindow);
-		let s = e.ownerDocument.URL;
-		return s.startsWith('chrome://') && s.endsWith('/popup.html');
-		// let s = a.ppm.firstChild.loadframe;
-		// return s && s.toString().endsWith(e.baseURI);
+		//console.log(e, e.ownerDocument);
+		if (a.ppm.id !== idWidgetPanel) return !1;
+		if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
+			this.frameURI = e.getAttribute('src');
+		return this.frameURI === e.baseURI || e.closest('[panelopen=true]');
 	}
 }
 btnManager = new class extends AutoPop {
@@ -257,7 +245,8 @@ btnManager = new class extends AutoPop {
 	}
 	mouseOver(e) {
 		this.clean();
-		if (e.disabled || this.inMenu(e))
+		_inMenu = this.inMenu(e);
+		if (_inMenu || e.disabled)
 			return;
 		for (let k of menuActContainer) {
 			if (k.isButton(e)) {
@@ -281,8 +270,7 @@ ppmManager = new class extends AutoPop {
 		}, nDelay);
 	}
 	mouseOver(e) {
-		if (this.inMenu(e)) {
-			//console.dir(this.act.ppm);
+		if (_inMenu) {
 			this.clearTimer();
 			return;
 		}
@@ -296,7 +284,7 @@ function mouseOver(ev) {
 		ppmManager.clean();
 		return;
 	}
-	let e = ev.target;
+	let e = ev.originalTarget;
 	if (e === prevElt) return;
 	prevElt = e;
 	scrX = ev.screenX;
