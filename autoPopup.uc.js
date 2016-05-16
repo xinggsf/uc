@@ -2,12 +2,12 @@
 // @name           autoPopup++
 // @description    Auto popup/close menu/panel
 // @updateURL      https://raw.githubusercontent.com/xinggsf/uc/master/autoPopup.uc.js
-// @homeURL      http://bbs.kafan.cn/thread-1866855-1-1.html
+// @homepageURL    http://bbs.kafan.cn/thread-1866855-1-1.html
 // @namespace      autoPopup-plus.xinggsf
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
 // @author         xinggsf
-// @version        2016.5.15
+// @version        2016.5.16
 // @note  2016.5.14  更精确的菜单内判断； 将菜单打开后才能取得菜单DOM的动作隐性放到mouseover事件
 // @note  2016.5.13  新增本地配置文件_autoPopup.js; 增加对扩展页、历史记录窗、F12窗口的菜单支持
 // @note  2016.5.11  fix:在定制窗取消搜索框后脚本失效；撤消按钮菜单不能自动隐藏
@@ -35,6 +35,7 @@ function $(id) {
 }
 
 const setFile = ["local", "_autoPopup.js"],
+idWidgetPanel = 'customizationui-widget-panel',
 ppmPos = ['after_start','end_before','before_start','start_before'];
 function getPopupPos(elt) {
 	let box, w, h, b = !1,
@@ -87,8 +88,8 @@ class MenuAct {//菜单动作基类
 	getPopupMenu(e) {
 		if (this.menuId) return $(this.menuId);
 		let s = e.getAttribute('context') || e.getAttribute('popup');
-		if (s) return $(s);
-		return e.querySelector('menupopup,menulist');
+		return (s && $(s)) || e.querySelector('menupopup');
+		//let c = e.ownerDocument.getAnonymousNodes(e);
 	}
 	get ppm() {
 		if (!this._ppm) this._ppm = this.getPopupMenu(this.btn);
@@ -118,8 +119,7 @@ class MenuAct {//菜单动作基类
 		}
 	}
 }
-const idWidgetPanel = 'customizationui-widget-panel';
-let btnSearch, menuActContainer = [
+let menuActContainer = [
 	new class extends MenuAct{//处理白名单
 		_isButton(e) {
 			if (!e.hasAttribute('id')) return !1;
@@ -179,19 +179,23 @@ let btnSearch, menuActContainer = [
 	}('#downloads-button','downloadsPanel'),
 	new MenuAct('[widget-id][widget-type]',idWidgetPanel),
 	new class extends MenuAct{
-		_isButton(e) {
-			if (!e.closest('#searchbar')) return !1;
-			let x = btnSearch.boxObject;
-			x = x.screenX + x.width;
-			return scrX < x;
-		}
 		close() {
 			BrowserSearch.searchBar.textbox.closePopup();
 		}
 		open() {
 			BrowserSearch.searchBar.openSuggestionsPanel();
 		}
-	}('','PopupSearchAutoComplete'),
+	}('[anonid=searchbar-search-button]','PopupSearchAutoComplete'),
+	//new MenuAct('toolbarbutton[role=button][type=menu]'),
+	new class extends MenuAct{
+		_isButton(e) {
+			return e.matches('toolbarbutton') && e.parentNode
+				.matches('toolbarbutton') && this.ppm;
+		}
+		getPopupMenu(e) {
+			return super.getPopupMenu(e.parentNode);
+		}
+	}(),
 	new class extends MenuAct{
 		_isButton(e) {
 			return /toolbarbutton|button/.test(e.localName) && this.ppm;
@@ -230,8 +234,8 @@ class AutoPop {
 		//console.log(e, e.ownerDocument);
 		if (a.ppm.id !== idWidgetPanel) return !1;
 		if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
-			this.frameURI = e.getAttribute('src');
-		return this.frameURI === e.baseURI || e.closest('[panelopen=true]');
+			a.frameURI = e.getAttribute('src');
+		return a.frameURI === e.baseURI || e.closest('[panelopen=true]');
 	}
 }
 btnManager = new class extends AutoPop {
@@ -278,7 +282,7 @@ ppmManager = new class extends AutoPop {
 	}
 }();
 
-let scrX, prevElt = null;
+let prevElt = null;
 function mouseOver(ev) {
 	if (!document.hasFocus()) {
 		ppmManager.clean();
@@ -287,14 +291,10 @@ function mouseOver(ev) {
 	let e = ev.originalTarget;
 	if (e === prevElt) return;
 	prevElt = e;
-	scrX = ev.screenX;
 	btnManager.mouseOver(e);
 	ppmManager.mouseOver(e);
 }
 
 if (!BrowserSearch.searchBar || $('omnibar-defaultEngine'))
-	menuActContainer.splice(-3, 1);
-else
-	btnSearch = BrowserSearch.searchBar.textbox
-	.querySelector('[anonid=searchbar-search-button]');
+	menuActContainer.splice(7, 1);
 window.addEventListener('mouseover', mouseOver, !1);
