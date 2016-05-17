@@ -7,7 +7,7 @@
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
 // @author         xinggsf
-// @version        2016.5.16
+// @version        2016.5.17
 // @note  2016.5.14  更精确的菜单内判断； 将菜单打开后才能取得菜单DOM的动作隐性放到mouseover事件
 // @note  2016.5.13  新增本地配置文件_autoPopup.js; 增加对扩展页、历史记录窗、F12窗口的菜单支持
 // @note  2016.5.11  fix:在定制窗取消搜索框后脚本失效；撤消按钮菜单不能自动隐藏
@@ -92,8 +92,13 @@ class MenuAct {//菜单动作基类
 		//let c = e.ownerDocument.getAnonymousNodes(e);
 	}
 	get ppm() {
-		if (!this._ppm) this._ppm = this.getPopupMenu(this.btn);
-		return this._ppm;
+		let m = this._ppm || this.getPopupMenu(this.btn);
+		if (m) {
+			let frm = m.querySelector('iframe[src][type=content]');
+			if (frm) this.frameURI = frm.getAttribute('src');
+			this._ppm = m;
+		}
+		return m;
 	}
 	open(){
 		let m = this.ppm;
@@ -228,14 +233,14 @@ class AutoPop {
 	inMenu(e) {
 		let a = ppmManager.act;
 		if (!a || !a.ppm) return !1;
-		if (e.nodeName === 'menuitem' || e === a.btn || a.ppm.contains(e) ||
-			e.closest('popupset'))
+		if (e.nodeName === 'menuitem' || e === a.btn || a.frameURI === e.baseURI ||
+			a.ppm.contains(e) || e.closest('popupset'))
 			return !0;
 		//console.log(e, e.ownerDocument);
 		if (a.ppm.id !== idWidgetPanel) return !1;
 		if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
 			a.frameURI = e.getAttribute('src');
-		return a.frameURI === e.baseURI || e.closest('[panelopen=true]');
+		return e.closest('[panelopen=true]');
 	}
 }
 btnManager = new class extends AutoPop {
