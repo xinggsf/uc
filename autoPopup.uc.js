@@ -1,21 +1,20 @@
 // ==UserScript==
 // @name           autoPopup++
-// @description    Auto popup/close menu/panel
+// @description    可定制化的自动弹出/关闭菜单/面板
+// @description:en Auto popup/close menu/panel
 // @updateURL      https://raw.githubusercontent.com/xinggsf/uc/master/autoPopup.uc.js
+// 配置文件        https://raw.githubusercontent.com/xinggsf/uc/master/_autoPopup.js
 // @homepageURL    http://bbs.kafan.cn/thread-1866855-1-1.html
 // @namespace      autoPopup-plus.xinggsf
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
+// @startup        onAutoPopup.startup();
+// @shutdown       onAutoPopup.shutdown();
 // @author         xinggsf
-// @version        2016.5.20
-// @note  2016.5.14  更精确的菜单内判断； 将菜单打开后才能取得菜单DOM的动作隐性放到mouseover事件
-// @note  2016.5.13  新增本地配置文件_autoPopup.js; 增加对扩展页、历史记录窗、F12窗口的菜单支持
-// @note  2016.5.11  fix:在定制窗取消搜索框后脚本失效；撤消按钮菜单不能自动隐藏
-// @note  2016.5.10  修正原始搜索框图标按钮自动菜单
-// @note  2016.5.9   增加对firefox英文版的支持。fix bug: widget按钮的菜单不能自动隐藏；有时不能自动弹出菜单；菜单之右键菜单导致误隐藏！
-// @note  2016.5.8   OOP封装：以清晰、简单的逻辑，真正实现自动弹出和关闭菜单
+// @version        2016.5.21
+// @note  修改Profiles\chrome\Local\_autoPopup.js配置文件可实现定制化
 // ==/UserScript==
-
+-function() {
 function clone(src){//浅克隆
 	if (!src) return src;
 	let r = src.constructor === Object ?
@@ -31,7 +30,7 @@ function clone(src){//浅克隆
 	return r;
 }
 function $(id) {
-	return document.getElementById(id);
+	return document.getElementById(id) ;
 }
 
 const setFile = ["local", "_autoPopup.js"],
@@ -73,7 +72,6 @@ function loadUserSet() {
 	fstream.close();
 	if (data) eval(data);
 }
-loadUserSet();
 
 class MenuAct {//菜单动作基类
 	constructor(btnCSS = '', menuId = '') {
@@ -274,23 +272,40 @@ ppmManager = new class extends AutoPop {
 	}
 }();
 
-let prevElt = null;
-function mouseOver(ev) {
-	if (!document.hasFocus()) {
-		ppmManager.clean();
-		return;
-	}
-	let e = ev.originalTarget;
-	if (e === prevElt) return;
-	prevElt = e;
-	btnManager.mouseOver(e);
-	ppmManager.mouseOver(e);
+if (window.onAutoPopup) {
+	window.onAutoPopup.shutdown();
+	delete window.onAutoPopup;
 }
+let prevElt;
+window.onAutoPopup = {//事件处理“类”
+    startup() {
+		prevElt = null;
+		loadUserSet();
+		let btnOmni = $('omnibar-defaultEngine');
+		if (!BrowserSearch.searchBar || btnOmni)
+			menuActContainer.splice(6, 1);
+		if (!btnOmni)
+			menuActContainer.splice(5, 1);
 
-let btnOmniSch = $('omnibar-defaultEngine');
-if (!BrowserSearch.searchBar || btnOmniSch)
-	menuActContainer.splice(6, 1);
-if (!btnOmniSch)
-	menuActContainer.splice(5, 1);
-//$('titlebar-spacer').appendChild($('alltabs-button'));
-window.addEventListener('mouseover', mouseOver, !1);
+	    window.addEventListener('mouseover', this.mouseOver, !1);
+	    window.addEventListener("unload", ev => {
+		  	if (!Application.windows.length) this.shutdown();
+		}, !1);
+    },
+	shutdown() {
+        window.removeEventListener('mouseover', this.mouseOver, !1);
+    },
+	mouseOver(ev) {
+		if (!document.hasFocus()) {
+			ppmManager.clean();
+			return;
+		}
+		let e = ev.originalTarget;
+		if (e === prevElt) return;
+		prevElt = e;
+		btnManager.mouseOver(e);
+		ppmManager.mouseOver(e);
+	},
+}
+onAutoPopup.startup();
+}();

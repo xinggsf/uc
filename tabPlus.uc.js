@@ -7,6 +7,7 @@
 // @include chrome://browser/content/bookmarks/bookmarksPanel.xul
 // @include chrome://browser/content/history/history-panel.xul
 // @include chrome://browser/content/places/places.xul
+// @version 2016.5.21
 // @Note xinggsf 2016.5.15  用API判断是否为FX可用地址
 // @Note xinggsf 2015.12.18 增加右击新建按钮新开剪贴板中的网址
 // @Note xinggsf 2015.1.28 整合，并去掉经常产生BUG的地址栏输入新开功能
