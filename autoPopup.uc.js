@@ -7,7 +7,7 @@
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
 // @author         xinggsf
-// @version        2016.5.17
+// @version        2016.5.20
 // @note  2016.5.14  更精确的菜单内判断； 将菜单打开后才能取得菜单DOM的动作隐性放到mouseover事件
 // @note  2016.5.13  新增本地配置文件_autoPopup.js; 增加对扩展页、历史记录窗、F12窗口的菜单支持
 // @note  2016.5.11  fix:在定制窗取消搜索框后脚本失效；撤消按钮菜单不能自动隐藏
@@ -137,8 +137,12 @@ let menuActContainer = [
 			return (id && $(id)) || super.getPopupMenu(e);
 		}
 		open() {
-			let fn = this.item.run;
+			let fn = this.item.open;
 			fn ? fn(this.btn) : super.open();
+		}
+		close() {
+			let fn = this.item.close;
+			fn ? fn(this.ppm) : super.close();
 		}
 	}(),
 	new class extends MenuAct{//处理黑名单
@@ -162,28 +166,11 @@ let menuActContainer = [
 		close() {
 			this.ppm.parentNode.closePopup();
 		}
-		open() {
-			this.ppm.showPopup();
-		}
 	}('dropmarker'),
-	new class extends MenuAct{
-		close() {
-			PanelUI.hide();
-		}
-		open() {
-			PanelUI.show();
-		}
-	}('#PanelUI-menu-button', 'PanelUI-popup'),
-	new class extends MenuAct{
-		close() {
-			DownloadsPanel.hidePanel();
-		}
-		open() {
-			DownloadsPanel.showPanel();
-		}
-	}('#downloads-button','downloadsPanel'),
 	new MenuAct('[widget-id][widget-type]',idWidgetPanel),
-	new class extends MenuAct{
+	//omnibar中的搜索引擎图标 btn => $('omnibar-in-urlbar').click()
+	new MenuAct('#omnibar-defaultEngine','omnibar-engine-menu'),
+	new class extends MenuAct{//原始搜索按钮
 		close() {
 			BrowserSearch.searchBar.textbox.closePopup();
 		}
@@ -240,7 +227,7 @@ class AutoPop {
 		if (a.ppm.id !== idWidgetPanel) return !1;
 		if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
 			a.frameURI = e.getAttribute('src');
-		return e.closest('[panelopen=true]');
+		return e.closest('vbox.panel-arrowcontainer,[panelopen=true]');
 	}
 }
 btnManager = new class extends AutoPop {
@@ -300,6 +287,10 @@ function mouseOver(ev) {
 	ppmManager.mouseOver(e);
 }
 
-if (!BrowserSearch.searchBar || $('omnibar-defaultEngine'))
-	menuActContainer.splice(7, 1);
+let btnOmniSch = $('omnibar-defaultEngine');
+if (!BrowserSearch.searchBar || btnOmniSch)
+	menuActContainer.splice(6, 1);
+if (!btnOmniSch)
+	menuActContainer.splice(5, 1);
+//$('titlebar-spacer').appendChild($('alltabs-button'));
 window.addEventListener('mouseover', mouseOver, !1);
