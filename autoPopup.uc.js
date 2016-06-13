@@ -5,13 +5,12 @@
 // @updateURL      https://raw.githubusercontent.com/xinggsf/uc/master/autoPopup.uc.js
 // 配置文件        https://raw.githubusercontent.com/xinggsf/uc/master/_autoPopup.js
 // @homepageURL    http://bbs.kafan.cn/thread-1866855-1-1.html
-// @namespace      autoPopup-plus.xinggsf
 // @include        chrome://browser/content/browser.xul
 // @compatibility  Firefox 45+
 // @startup        onAutoPopup.startup();
 // @shutdown       onAutoPopup.shutdown();
 // @author         xinggsf
-// @version        2016.5.21
+// @version        2016.6.13
 // @note  修改Profiles\chrome\Local\_autoPopup.js配置文件可实现定制化
 // ==/UserScript==
 -function() {
@@ -35,6 +34,7 @@ function $(id) {
 
 const setFile = ["local", "_autoPopup.js"],
 idWidgetPanel = 'customizationui-widget-panel',
+
 ppmPos = ['after_start','end_before','before_start','start_before'];
 function getPopupPos(elt) {
 	let box, w, h, b = !1,
@@ -56,6 +56,7 @@ function getPopupPos(elt) {
 			(y <= h / 2 + box.screenY ? 0 : 2);
 	return ppmPos[x];
 }
+
 let nDelay, blackIDs, whiteIDs;
 function loadUserSet() {
 	let aFile = FileUtils.getFile("UChrm", setFile, false);
@@ -177,6 +178,7 @@ let menuActContainer = [
 		}
 	}('[anonid=searchbar-search-button]','PopupSearchAutoComplete'),
 	//new MenuAct('toolbarbutton[role=button][type=menu]'),
+	//new MenuAct('#bookmarks-menu-button > toolbarbutton', 'BMB_bookmarksPopup'),
 	new class extends MenuAct{
 		_isButton(e) {
 			return e.matches('toolbarbutton') && e.parentNode
@@ -219,13 +221,13 @@ class AutoPop {
 		let a = ppmManager.act;
 		if (!a || !a.ppm) return !1;
 		if (e.nodeName === 'menuitem' || e === a.btn || a.frameURI === e.baseURI ||
-			a.ppm.contains(e) || e.closest('popupset'))
+			a.ppm.contains(e) || e.closest('vbox.panel-arrowcontainer,popupset'))
 			return !0;
-		//console.log(e, e.ownerDocument);
 		if (a.ppm.id !== idWidgetPanel) return !1;
+		//console.log(e, e.ownerDocument);
 		if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
 			a.frameURI = e.getAttribute('src');
-		return e.closest('vbox.panel-arrowcontainer,[panelopen=true]');
+		return e.closest('[panelopen=true]');
 	}
 }
 btnManager = new class extends AutoPop {
@@ -288,13 +290,9 @@ window.onAutoPopup = {//事件处理“类”
 			menuActContainer.splice(5, 1);
 
 	    window.addEventListener('mouseover', this.mouseOver, !1);
-	    window.addEventListener("unload", ev => {
-		  	if (!Application.windows.length) this.shutdown();
-		}, !1);
+	    window.addEventListener("unload", this.shutdown);
     },
-	shutdown() {
-        window.removeEventListener('mouseover', this.mouseOver, !1);
-    },
+	shutdown: ev => window.removeEventListener('mouseover', this.mouseOver),
 	mouseOver(ev) {
 		if (!document.hasFocus()) {
 			ppmManager.clean();
@@ -308,4 +306,5 @@ window.onAutoPopup = {//事件处理“类”
 	},
 }
 onAutoPopup.startup();
+
 }();
