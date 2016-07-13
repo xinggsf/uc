@@ -3,7 +3,7 @@
 // @description     视频站去广告
 // @include         main
 // @author          xinggsf
-// @version         2016.7.13
+// @version         2016.7.14
 // @homepage        http://blog.csdn.net/xinggsf
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
@@ -33,6 +33,7 @@
 		'|http://sax.sina.com.cn/',
 		'|http://de.as.pptv.com/',
 		'||.gtimg.com/qqlive/', //qq pause
+		'/vmind.qqvideo.tc.qq.com/',
 		/^http:\/\/v\.163\.com\/special\/.+\.xml/,
 		/^http:\/\/www\.iqiyi\.com\/common\/flashplayer\/\d+\/(\w{32}|cornersign.+)\.swf/,//pause
 		'||.letvimg.com/',
@@ -67,6 +68,8 @@
 		},{
 			'id': 'iqiyi',
 			'player': /^http:\/\/www\.iqiyi\.com\/.+player.+\.swf/,
+			//封面 www.iqiyi.com/common/flashplayer/20160425/\w+.swf
+			//'cover': '|http://www.iqiyi.com/common/flashplayer/201',
 			'url': /^http:\/\/(\w+\.){3}\w+\/videos\/other\/\d+\/.+\.(f4v|hml)/
 		},{
 			'id': 'iqiyi_acfun',
@@ -77,11 +80,12 @@
 			'player': /^http:\/\/tv\.sohu\.com\/upload\/swf\/.+\/main\.swf/,
 			'url': '|http://v.aty.sohu.com/v',
 			'secured': true
-		},{
+		},
+/* 		{
 			'id': 'qq',
 			'url': '/vmind.qqvideo.tc.qq.com/',
-			'player': /^http:\/\/(cache\.tv|imgcache)\.qq\.com\/.+player.*\.swf/
-		},
+			'player': /^http:\/\/(cache\.tv|imgcache)\.qq\.com\/.+player.*\.swf/,
+		}, */
 	],
 	HTML5_FILTERS = [
 		{//音悦台MV去黑屏
@@ -149,6 +153,8 @@
 			o.style.display = 'none';
 			setTimeout(() => {
 				s ? o.style.display = s : o.style.removeProperty('display');
+				if ('' === o.getAttribute('style'))
+					o.removeAttribute('style');
 			}, 9);
 		},
 		setFlashParam: function(p, name, v) {
@@ -204,18 +210,20 @@
 		directFilter: function(url) {
 			return DIRECT_FILTERS.some(k => url.mixMatchUrl(k));
 		},
+		matchPlayer: function(filterItem, url) {
+			let m = filterItem.player;
+			return (m instanceof Array) ?
+					m.some(i => url.mixMatchUrl(i)) :
+					url.mixMatchUrl(m);
+		},
 		doPlayer: function(url, node) {
 			// if (!Utils.verifyHeader(http, 'Content-Type', 'application/x-shockwave-flash'))
 				// return;
 			for (let i of FILTERS) {
-				let r = (i.player instanceof Array) ?
-					i.player.some(j => url.mixMatchUrl(j)) :
-					url.mixMatchUrl(i.player);
-				if (r) {
+				if (this.matchPlayer(i, url)) {
 					i.swf = url;
 					Utils.openFlashGPU(node, {'isPlayer': 1});
-					if (typeof i.preHandle === 'function')
-						i.preHandle(url);
+					this.players.add(node);
 					return;
 				}
 			}
@@ -230,10 +238,24 @@
 				delete this.blockUrls[s];
 			}
 		},
-		preFilter: function(playerUrl, url) {
-			let k = FILTERS.find(i => i.swf === playerUrl &&
-				url.mixMatchUrl(i.url));
-			if (k) this.blockUrls[url] = k;
+		preFilter: function(node, url) {
+			let i, r = this.players.has(node),//是播放器的请求
+			playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
+				node.src : node.data || node.children.movie.value;
+			playerUrl = playerUrl.toLowerCase();
+			Application.console.log(`${node}, ${url}`);
+			for (i of FILTERS) {
+				if (r && i.swf !== playerUrl &&
+					this.matchPlayer(i, playerUrl))
+				{
+					i.count = 0;
+					i.swf = playerUrl;
+				}
+				if (i.swf === playerUrl && url.mixMatchUrl(i.url)) {
+					this.blockUrls[url] = i;
+					return;
+				}
+			}
 		},
 		html5Filter: function(http) {
             // if (!Utils.verifyHeader(http, 'Content-Type', 'video/'))
@@ -250,11 +272,11 @@
 			http.setRequestHeader('Referer', 'http://www.youku.com/', !1);
 		},
         // nsIContentPolicy interface implementation
-		// @contentType: TYPE_IMAGE=3, TYPE_OBJECT=5, TYPE_SUBDOCUMENT =7, TYPE_OBJECT_SUBREQUEST =12, TYPE_MEDIA =15, TYPE_OTHER =1
+		// @contentType: TYPE_IMAGE=3, TYPE_OBJECT=5, TYPE_DOCUMENT =6, TYPE_SUBDOCUMENT =7, TYPE_OBJECT_SUBREQUEST =12, TYPE_MEDIA =15, TYPE_OTHER =1
 		//@contentLocation 请求地址URI, @requestOrigin 页面地址URI
         shouldLoad: function(contentType, contentLocation, requestOrigin, node, mimeTypeGuess, extra) {
 			// Ignore requests without context and top-level documents
-			if (!node || contentType == Ci.nsIContentPolicy.TYPE_DOCUMENT)
+			if (!node || contentType == 6)
 				return Ci.nsIContentPolicy.ACCEPT;
 
 			let wnd = Utils.getWindow(node);
@@ -262,6 +284,9 @@
 				return Ci.nsIContentPolicy.ACCEPT;
 
 			let url = Utils.unwrapURL(contentLocation).spec.toLowerCase();
+			/* if (node instanceof Ci.nsIDOMHTMLObjectElement) {
+				Application.console.log(`${node}, contentType: ${contentType} , ${url}`);
+			} */
 			if (contentType !==12 && (node instanceof Ci.nsIDOMHTMLObjectElement || node instanceof Ci.nsIDOMHTMLEmbedElement))
 			{
 				//Fix type for objects misrepresented as frames or images
@@ -279,14 +304,14 @@
 				this.doPlayer(url, node);
 			}
 			else if (contentType === 12) {//object_subrequest
-				//Application.console.log(requestOrigin.spec);
-				let playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
-					node.src : node.data || node.children.movie.value;
-				this.preFilter(playerUrl.toLowerCase(), url);
+				this.preFilter(node, url);
 				if (this.directFilter(url))
 					return Ci.nsIContentPolicy.REJECT_REQUEST;
 			}
 			return Ci.nsIContentPolicy.ACCEPT;
+        },
+        shouldProcess: function(contentType, contentLocation, requestOrigin, node, mimeTypeGuess, extra) {
+            return Ci.nsIContentPolicy.ACCEPT;
         },
         observe: function(aSubject, aTopic, aData) {
             let http = aSubject.QueryInterface(Ci.nsIHttpChannel);
@@ -312,15 +337,13 @@
                 Services.obs.addObserver(this, "http-on-examine-response", false);
             }
 			let item = FILTERS.find(k => k.id === 'iqiyi');
-			item.preHandle = function (url) {
-				this.count = 0;
-			};
 			item.filter = function (http) {
 				this.count ++;
 				if (2 !== this.count)
 					Utils.block(http, this.secured);
 			};
 			this.blockUrls = {};
+			this.players = new WeakSet();
         },
         shutdown: function() {
             let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
@@ -329,7 +352,7 @@
                 let catMan = XPCOMUtils.categoryManager;
                 for (let category of this.xpcom_categories)
                     catMan.deleteCategoryEntry(category, this.contractID, false);
-                //Services.obs.removeObserver(this, "http-on-modify-request", false);
+                //Services.obs.removeObserver(this, "http-on-modify-request");
                 Services.obs.removeObserver(this, "http-on-examine-response", false);
             }
 			this.blockUrls = null;
