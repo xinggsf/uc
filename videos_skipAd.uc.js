@@ -3,7 +3,7 @@
 // @description     视频站去广告
 // @include         main
 // @author          xinggsf
-// @version         2016.7.11
+// @version         2016.7.13
 // @homepage        http://blog.csdn.net/xinggsf
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
@@ -36,7 +36,7 @@
 		/^http:\/\/v\.163\.com\/special\/.+\.xml/,
 		/^http:\/\/www\.iqiyi\.com\/common\/flashplayer\/\d+\/(\w{32}|cornersign.+)\.swf/,//pause
 		'||.letvimg.com/',
-		/^http:\/\/(\d+\.){3}\d+\/(\d{1,3}\/){3}letv-gug\/\d{1,3}\/ver.+\.letv/,
+		/^http:\/\/(\d+\.){3}\d+\/(\d{1,3}\/){3}letv-gug\/\d{1,3}\/ver.+\.mp4\?/,
 	],
 	swfWhiteList = [//gpu加速白名单
 		'||.pdim.gs/static/',//熊猫直播
@@ -280,7 +280,8 @@
 			}
 			else if (contentType === 12) {//object_subrequest
 				//Application.console.log(requestOrigin.spec);
-				let playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ? node.src : node.data || node.children.movie.value;
+				let playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
+					node.src : node.data || node.children.movie.value;
 				this.preFilter(playerUrl.toLowerCase(), url);
 				if (this.directFilter(url))
 					return Ci.nsIContentPolicy.REJECT_REQUEST;
