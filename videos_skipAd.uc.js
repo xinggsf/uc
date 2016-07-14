@@ -3,7 +3,7 @@
 // @description     视频站去广告
 // @include         main
 // @author          xinggsf
-// @version         2016.7.14
+// @version         2016.7.15
 // @homepage        http://blog.csdn.net/xinggsf
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
@@ -18,8 +18,11 @@
 	String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 		if (ml instanceof RegExp)
 			return ml.test(this);
-		if (ml.startsWith('||'))
-			return -1 !== this.indexOf(ml.slice(2), 7);
+		if (ml.startsWith('||')) {//ml: '||.cn/xxxxx'
+			let i = this.indexOf('/', 11)-3, //4: g.cn; 11:7+4
+			j = this.indexOf(ml.slice(2), 7);
+			return -1 !== j && j < i;
+		}
 		if (ml[0] === '|')
 			return this.startsWith(ml.slice(1));
 		if (ml[ml.length-1] === '|')
@@ -68,8 +71,7 @@
 		},{
 			'id': 'iqiyi',
 			'player': /^http:\/\/www\.iqiyi\.com\/.+player.+\.swf/,
-			//封面 www.iqiyi.com/common/flashplayer/20160425/\w+.swf
-			//'cover': '|http://www.iqiyi.com/common/flashplayer/201',
+			'cover': '|http://cache.video.qiyi.com/vms?',
 			'url': /^http:\/\/(\w+\.){3}\w+\/videos\/other\/\d+\/.+\.(f4v|hml)/
 		},{
 			'id': 'sohu',
@@ -79,8 +81,9 @@
 		},
 /* 		{
 			'id': 'qq',
-			'url': '/vmind.qqvideo.tc.qq.com/',
 			'player': /^http:\/\/(cache\.tv|imgcache)\.qq\.com\/.+player.*\.swf/,
+			'url': '/vmind.qqvideo.tc.qq.com/',
+			'cover': '||.l.qq.com/livemsg?ty=web&ad_type=',
 		}, */
 	],
 	HTML5_FILTERS = [
@@ -218,9 +221,6 @@
 					i.swf = url;
 					i.count = 0;
 					Utils.openFlashGPU(node, {'isPlayer': 1});
-					//处理列表播放问题
-					let s = Utils.getWindow(node).location.href;
-					this.players.set(node, s);
 					return;
 				}
 			}
@@ -236,19 +236,18 @@
 			}
 		},
 		preFilter: function(node, url) {
-			let i, 
+			let i,
 			playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
-				node.src : node.data || node.children.movie.value,
-			//处理列表播放问题
-			s = Utils.getWindow(node).location.href,
-			r = this.players.has(node) && s === this.players.get(node);
-			if (!r) this.players.set(node, s);
+				node.src : node.data || node.children.movie.value;
 			playerUrl = playerUrl.toLowerCase();
 			//Application.console.log(`${node}, ${url}`);
 			for (i of FILTERS) {
-				if (!r && this.matchPlayer(i, playerUrl)) {
-					i.count = 0;
-					i.swf = playerUrl;
+				if (i.cover && url.mixMatchUrl(i.cover)){
+					if (this.matchPlayer(i, playerUrl)) {
+						i.count = 0;
+						i.swf = playerUrl;
+					}
+					return;
 				}
 				if (i.swf === playerUrl && url.mixMatchUrl(i.url)) {
 					this.blockUrls[url] = i;
@@ -337,7 +336,6 @@
 					Utils.block(http, this.secured);
 			};
 			this.blockUrls = {};
-			this.players = new WeakMap();
         },
         shutdown: function() {
             let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
