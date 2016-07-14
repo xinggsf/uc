@@ -72,10 +72,6 @@
 			//'cover': '|http://www.iqiyi.com/common/flashplayer/201',
 			'url': /^http:\/\/(\w+\.){3}\w+\/videos\/other\/\d+\/.+\.(f4v|hml)/
 		},{
-			'id': 'iqiyi_acfun',
-			'player': '|http://cdn.aixifan.com/player/cooperation/acfunxqiyi.swf',
-			'url': '||t7z.cupid.iqiyi.com/'
-		},{
 			'id': 'sohu',
 			'player': /^http:\/\/tv\.sohu\.com\/upload\/swf\/.+\/main\.swf/,
 			'url': '|http://v.aty.sohu.com/v',
@@ -217,13 +213,14 @@
 					url.mixMatchUrl(m);
 		},
 		doPlayer: function(url, node) {
-			// if (!Utils.verifyHeader(http, 'Content-Type', 'application/x-shockwave-flash'))
-				// return;
 			for (let i of FILTERS) {
 				if (this.matchPlayer(i, url)) {
 					i.swf = url;
+					i.count = 0;
 					Utils.openFlashGPU(node, {'isPlayer': 1});
-					this.players.add(node);
+					//处理列表播放问题
+					let s = Utils.getWindow(node).location.href;
+					this.players.set(node, s);
 					return;
 				}
 			}
@@ -239,15 +236,17 @@
 			}
 		},
 		preFilter: function(node, url) {
-			let i, r = this.players.has(node),//是播放器的请求
+			let i, 
 			playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
-				node.src : node.data || node.children.movie.value;
+				node.src : node.data || node.children.movie.value,
+			//处理列表播放问题
+			s = Utils.getWindow(node).location.href,
+			r = this.players.has(node) && s === this.players.get(node);
+			if (!r) this.players.set(node, s);
 			playerUrl = playerUrl.toLowerCase();
-			Application.console.log(`${node}, ${url}`);
+			//Application.console.log(`${node}, ${url}`);
 			for (i of FILTERS) {
-				if (r && i.swf !== playerUrl &&
-					this.matchPlayer(i, playerUrl))
-				{
+				if (!r && this.matchPlayer(i, playerUrl)) {
 					i.count = 0;
 					i.swf = playerUrl;
 				}
@@ -258,8 +257,6 @@
 			}
 		},
 		html5Filter: function(http) {
-            // if (!Utils.verifyHeader(http, 'Content-Type', 'video/'))
-				// return;
 			let s = http.URI.spec.toLowerCase();
 			for (let i of HTML5_FILTERS) {
 				if (s.mixMatchUrl(i.url)) {
@@ -280,8 +277,7 @@
 				return Ci.nsIContentPolicy.ACCEPT;
 
 			let wnd = Utils.getWindow(node);
-			if (!wnd)
-				return Ci.nsIContentPolicy.ACCEPT;
+			if (!wnd) return Ci.nsIContentPolicy.ACCEPT;
 
 			let url = Utils.unwrapURL(contentLocation).spec.toLowerCase();
 			/* if (node instanceof Ci.nsIDOMHTMLObjectElement) {
@@ -291,8 +287,7 @@
 			{
 				//Fix type for objects misrepresented as frames or images
 				if (/\.swf(?:$|\?)/.test(url)) {
-					if (contentType !==5 &&
-						(contentType ===3 || contentType ===7))
+					if (contentType !==5 && (contentType ===3 || contentType ===7))
 						contentType = 5;
 				}
 				//Fix type for object_subrequest misrepresented as media/images/other
@@ -322,7 +317,6 @@
 					break;
 				//case 'http-on-modify-request':
 					//this.setReferer(http);
-					//this.directFilter(http);
 					//break;
 			}
         },
@@ -343,7 +337,7 @@
 					Utils.block(http, this.secured);
 			};
 			this.blockUrls = {};
-			this.players = new WeakSet();
+			this.players = new WeakMap();
         },
         shutdown: function() {
             let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
