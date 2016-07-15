@@ -4,11 +4,18 @@
 // @include         main
 // @author          xinggsf
 // @version         2016.7.15
-// @homepage        http://blog.csdn.net/xinggsf
+// @homepage        http://bbs.kafan.cn/thread-2048252-1-1.html
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
 // @shutdown        videos_skipAd.shutdown();
-// ==/UserScript==
+// ==/UserScript
+
+/* 为去黑屏，请在ABP之类的过滤工具中添加免过滤规则：
+@@|http://hc.yinyuetai.com/partner/yyt/
+@@|http://v.aty.sohu.com/v$object-subrequest
+@@||atm.youku.com/v$object-subrequest
+
+*/
 (function() {
 	if (!String.prototype.includes) {
 		String.prototype.includes = function(s) {
@@ -36,7 +43,7 @@
 		'|http://sax.sina.com.cn/',
 		'|http://de.as.pptv.com/',
 		'||.gtimg.com/qqlive/', //qq pause
-		'/vmind.qqvideo.tc.qq.com/',
+		//'/vmind.qqvideo.tc.qq.com/',
 		/^http:\/\/v\.163\.com\/special\/.+\.xml/,
 		/^http:\/\/www\.iqiyi\.com\/common\/flashplayer\/\d+\/(\w{32}|cornersign.+)\.swf/,//pause
 		'||.letvimg.com/',
@@ -101,34 +108,9 @@
 				return node.defaultView;
 			return null;
 		},
-        getNodeForRequest: function(http){
-            if (http instanceof Ci.nsIRequest){
-                try {
-                    let x = http.notificationCallbacks ||
-						http.loadGroup.notificationCallbacks;
-					if (x) return x.getInterface(Ci.nsILoadContext);
-                } catch(e) {}
-            }
-            return null;
-        },
-        getWindowForRequest: function(http){
-			let node = this.getNodeForRequest(http);
-            if (node) return node.associatedWindow;
-            return null;
-        },
 		block: function(http, secured) {
 			if (secured) http.suspend();
 			else http.cancel(Cr.NS_BINDING_ABORTED);
-		},
-		verifyHeader: function(http, field, partVal) {
-			try {
-				return http.getResponseHeader(field).includes(partVal);
-            } catch(e) {
-				return !1;
-			}
-		},
-		isFromFlash: function(http) {
-			return /\.swf(?:$|\?)/.test(http.referrer.spec);
 		},
 		openFlashGPU: function(p, data) {
 			if (!data.isPlayer && !this.isPlayer(p, data.url))
