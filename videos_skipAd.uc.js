@@ -3,14 +3,16 @@
 // @description     视频站去广告
 // @include         main
 // @author          xinggsf
-// @version         2016.7.15
+// @version         2016.7.16
 // @homepage        http://bbs.kafan.cn/thread-2048252-1-1.html
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
 // @shutdown        videos_skipAd.shutdown();
 // ==/UserScript
 
-/* 为去黑屏，请在ABP之类的过滤工具中添加免过滤规则：
+/*
+https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/nsIHttpChannel
+为去黑屏，请在ABP之类的过滤工具中添加免过滤规则：
 @@|http://hc.yinyuetai.com/partner/yyt/
 @@|http://v.aty.sohu.com/v$object-subrequest
 @@||atm.youku.com/v$object-subrequest
@@ -26,7 +28,7 @@
 		if (ml instanceof RegExp)
 			return ml.test(this);
 		if (ml.startsWith('||')) {//ml: '||.cn/xxxxx'
-			let i = this.indexOf('/', 11)-3, //4: g.cn; 11:7+4
+			let i = this.indexOf('/', 11) -3, //4: g.cn; 11:7+4
 			j = this.indexOf(ml.slice(2), 7);
 			return -1 !== j && j < i;
 		}
@@ -61,7 +63,7 @@
 		/clipboard\d*\.swf$/,
 		'|http://static92cc.db-cache.com/swf/',
 	];
-	FILTERS = [
+	let FILTERS = [
 		{
 			'id': 'youku',
 			'player': [
@@ -74,7 +76,7 @@
 		},{
 			'id': 'tudou',
 			'player': /^http:\/\/js\.tudouui\.com\/.+player.+\.swf/,
-			'url': /^http:\/\/val[fcopb]\.atm\.youku\.com\/v[fcopb]/,
+			'url': /^http:\/\/val[fcopb]\.atm\.youku\.com\/v[fcopb]/
 		},{
 			'id': 'iqiyi',
 			'player': /^http:\/\/www\.iqiyi\.com\/.+player.+\.swf/,
@@ -90,34 +92,78 @@
 			'id': 'qq',
 			'player': /^http:\/\/(cache\.tv|imgcache)\.qq\.com\/.+player.*\.swf/,
 			'url': '/vmind.qqvideo.tc.qq.com/',
-			'cover': '||.l.qq.com/livemsg?ty=web&ad_type=',
+			'cover': '||.l.qq.com/livemsg?ty=web&ad_type='
 		}, */
 	],
 	HTML5_FILTERS = [
 		{//音悦台MV去黑屏
 			'id': 'yinyuetai',
-			'url': '|http://hc.yinyuetai.com/partner/yyt/',
-			'secured': true
+			'url': '|http://hc.yinyuetai.com/partner/yyt/'
 		},
 	];
+
 	let Utils = {
 		getWindow: function(node) {
-			if ("ownerDocument" in node && node.ownerDocument)
+			if (node.ownerDocument)
 				node = node.ownerDocument;
 			if ("defaultView" in node)
 				return node.defaultView;
 			return null;
 		},
+		getDOMWindow: function(win) { //win是chrome窗口
+			try { //nsIInterfaceRequestor为聚合接口，即一个对象实现多个接口
+				return win.QueryInterface(Ci.nsIInterfaceRequestor)
+						.getInterface(Ci.nsIWebNavigation)
+						.QueryInterface(Ci.nsIDocShellTreeItem)
+						.rootTreeItem
+						.QueryInterface(Ci.nsIInterfaceRequestor)
+						.getInterface(Ci.nsIDOMWindow);
+			} catch(e) {}
+		},
+        getNodeForRequest: function(http) {
+            if (http instanceof Ci.nsIRequest){
+                try {
+                    let x = http.notificationCallbacks ||
+						http.loadGroup.notificationCallbacks;
+					if (x) return x.getInterface(Ci.nsILoadContext);
+						// x.getInterface(Ci.nsIDOMNode)//nsIDOMNode无定义
+                } catch(e) {}
+            }
+            return null;
+        },
+        getWindowForRequest: function(http){
+            if (http instanceof Ci.nsIRequest){
+                try {
+                    let x = http.notificationCallbacks ||
+						http.loadGroup.notificationCallbacks;
+					if (x) return x.getInterface(Ci.nsILoadContext)
+						.associatedWindow;
+                } catch(e) {}
+            }
+            return null;
+        },
 		block: function(http, secured) {
 			if (secured) http.suspend();
 			else http.cancel(Cr.NS_BINDING_ABORTED);
 		},
+		verifyHeader: function(http, field, partVal) {
+			try {
+				return http.getResponseHeader(field).includes(partVal);
+            } catch(e) {
+				Cu.reportError(e);
+				return !1;
+			}
+		},
+		/* 错！referrer是指页面地址，而非requestHeader中的Referer指向node地址或页面地址
+		isFromFlash: function(http) {
+			return /\.swf(?:$|\?)/.test(http.referrer.spec);
+		}, */
 		openFlashGPU: function(p, data) {
-			if (!data.isPlayer && !this.isPlayer(p, data.url))
+			if ('url' in data && !this.isPlayer(p, data.url))
 				return;
 			(p instanceof Ci.nsIDOMHTMLEmbedElement) ? p.setAttribute('wmode', 'gpu')
 				: this.setFlashParam(p, 'wmode', 'gpu');
-			this.refreshElem(p);
+			p.parentNode.replaceChild(p.cloneNode(true), p);
 		},
 		isPlayer: function(p, url) {
 			if (swfWhiteList.some(x => url.mixMatchUrl(x))) return !0;
@@ -128,15 +174,6 @@
 			if (p instanceof Ci.nsIDOMHTMLEmbedElement)
 				return p.matches('[allowFullScreen]');
 			return /"allowfullscreen"/i.test(p.innerHTML);
-		},
-		refreshElem: function(o) {
-			let s = o.style.display;
-			o.style.display = 'none';
-			setTimeout(() => {
-				s ? o.style.display = s : o.style.removeProperty('display');
-				if ('' === o.getAttribute('style'))
-					o.removeAttribute('style');
-			}, 9);
 		},
 		setFlashParam: function(p, name, v) {
 			let e = p.querySelector('embed');
@@ -202,11 +239,11 @@
 				if (this.matchPlayer(i, url)) {
 					i.swf = url;
 					i.count = 0;
-					Utils.openFlashGPU(node, {'isPlayer': 1});
+					Utils.openFlashGPU(node, {});
 					return;
 				}
 			}
-			Utils.openFlashGPU(node, {'url': url});
+			Utils.openFlashGPU(node, {url});
 		},
 		filter: function(http) {
 			let s = http.URI.spec.toLowerCase();
@@ -218,13 +255,12 @@
 			}
 		},
 		preFilter: function(node, url) {
-			let i,
-			playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
+			let playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
 				node.src : node.data || node.children.movie.value;
 			playerUrl = playerUrl.toLowerCase();
-			//Application.console.log(`${node}, ${url}`);
-			for (i of FILTERS) {
-				if (i.cover && url.mixMatchUrl(i.cover)){
+			//Cu.reportError(`${node}, ${url}`);
+			for (let i of FILTERS) {
+				if (i.cover && url.mixMatchUrl(i.cover)) {
 					if (this.matchPlayer(i, playerUrl)) {
 						i.count = 0;
 						i.swf = playerUrl;
@@ -238,6 +274,8 @@
 			}
 		},
 		html5Filter: function(http) {
+			// if (http.contentType !== 'video/mp4') return;
+			if (http.isNoCacheResponse()) return;
 			let s = http.URI.spec.toLowerCase();
 			for (let i of HTML5_FILTERS) {
 				if (s.mixMatchUrl(i.url)) {
@@ -249,9 +287,10 @@
 		setReferer: function(http) {
 			http.setRequestHeader('Referer', 'http://www.youku.com/', !1);
 		},
-        // nsIContentPolicy interface implementation
-		// @contentType: TYPE_IMAGE=3, TYPE_OBJECT=5, TYPE_DOCUMENT =6, TYPE_SUBDOCUMENT =7, TYPE_OBJECT_SUBREQUEST =12, TYPE_MEDIA =15, TYPE_OTHER =1
-		//@contentLocation 请求地址URI, @requestOrigin 页面地址URI
+        /** nsIContentPolicy interface implementation
+		@contentType: TYPE_IMAGE=3, TYPE_OBJECT=5, TYPE_DOCUMENT =6, TYPE_SUBDOCUMENT =7, TYPE_OBJECT_SUBREQUEST =12, TYPE_MEDIA =15, TYPE_OTHER =1
+		@contentLocation 请求地址URI
+		@requestOrigin 页面地址URI  */
         shouldLoad: function(contentType, contentLocation, requestOrigin, node, mimeTypeGuess, extra) {
 			// Ignore requests without context and top-level documents
 			if (!node || contentType == 6)
@@ -261,22 +300,18 @@
 			if (!wnd) return Ci.nsIContentPolicy.ACCEPT;
 
 			let url = Utils.unwrapURL(contentLocation).spec.toLowerCase();
-			/* if (node instanceof Ci.nsIDOMHTMLObjectElement) {
-				Application.console.log(`${node}, contentType: ${contentType} , ${url}`);
-			} */
-			if (contentType !==12 && (node instanceof Ci.nsIDOMHTMLObjectElement || node instanceof Ci.nsIDOMHTMLEmbedElement))
+			if (contentType !==5 && contentType !==12 && (node instanceof Ci.nsIDOMHTMLObjectElement || node instanceof Ci.nsIDOMHTMLEmbedElement))
 			{
-				//Fix type for objects misrepresented as frames or images
-				if (/\.swf(?:$|\?)/.test(url)) {
-					if (contentType !==5 && (contentType ===3 || contentType ===7))
-						contentType = 5;
-				}
-				//Fix type for object_subrequest misrepresented as media/images/other
-				else if (contentType ===1 || contentType ===3 || contentType ===15)
+				//Fix type for object_subrequest misrepresented as media/images..etc
+				if (!/\.swf(?:$|\?)/.test(url))
 					contentType = 12;
+				//Fix type for objects misrepresented as frames or images
+				else if (contentType ===3 || contentType ===7)
+					contentType = 5;
 			}
 
 			if (contentType === 5) {//objects
+				//Application.console.log(`${node}, ${url}`);
 				this.doPlayer(url, node);
 			}
 			else if (contentType === 12) {//object_subrequest
@@ -329,7 +364,7 @@
                 //Services.obs.removeObserver(this, "http-on-modify-request");
                 Services.obs.removeObserver(this, "http-on-examine-response", false);
             }
-			this.blockUrls = null;
+			delete this.blockUrls;
         }
     };
 
