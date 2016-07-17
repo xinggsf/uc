@@ -49,12 +49,12 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 		/^http:\/\/v\.163\.com\/special\/.+\.xml/,
 		/^http:\/\/www\.iqiyi\.com\/common\/flashplayer\/\d+\/(\w{32}|cornersign.+)\.swf/,//pause
 		'||.letvimg.com/',
-		/^http:\/\/(\d+\.){3}\d+\/(\d{1,3}\/){3}letv-gug\/\d{1,3}\/ver.+\.mp4\?/,
+		/^http:\/\/(\d+\.){3}(\d{1,3}\/){4}letv-gug\/\d{1,3}\/ver.+\.mp4\?/,
 	],
 	swfWhiteList = [//gpu加速白名单
 		'||.pdim.gs/static/',//熊猫直播
 		'|http://v.6.cn/apple/player/',
-		'||.plures.net/pts/swfbin/player/live.swf',//龙珠直播
+		'||.plures.net/pts/swfbin/player/',//龙珠直播
 		'|http://www.gaoxiaovod.com/ck/player.swf',
 		'|http://assets.dwstatic.com/video/',
 	],
@@ -62,6 +62,8 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 		'upload.swf',
 		/clipboard\d*\.swf$/,
 		'|http://static92cc.db-cache.com/swf/',
+		'||.douyutv.com/',
+		'|http://www.kcis.cn/wp-content/themes/kcis/',
 	];
 	let FILTERS = [
 		{
@@ -79,7 +81,10 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 			'url': /^http:\/\/val[fcopb]\.atm\.youku\.com\/v[fcopb]/
 		},{
 			'id': 'iqiyi',
-			'player': /^http:\/\/www\.iqiyi\.com\/.+player.+\.swf/,
+			'player':[
+				/^http:\/\/www\.iqiyi\.com\/.+player.+\.swf/,
+				'|http://dispatcher.video.qiyi.com/disp/',
+			],
 			'cover': '|http://cache.video.qiyi.com/vms?',
 			'url': /^http:\/\/(\w+\.){3}\w+\/videos\/other\/\d+\/.+\.(f4v|hml)/
 		},{
@@ -154,7 +159,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 				return !1;
 			}
 		},
-		/* 错！referrer是指页面地址，而非requestHeader中的Referer指向node地址或页面地址
+		/* 错！referrer是指页面地址，而requestHeader中的Referer才是指向node地址或页面地址
 		isFromFlash: function(http) {
 			return /\.swf(?:$|\?)/.test(http.referrer.spec);
 		}, */
