@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name            videos_skipAd.uc
-// @description     视频站去广告
+// @description     视频去广告
 // @include         main
 // @author          xinggsf
-// @version         2016.7.16
+// @version         2016.7.20
 // @homepage        http://bbs.kafan.cn/thread-2048252-1-1.html
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
@@ -30,7 +30,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 		if (ml.startsWith('||')) {//ml: '||.cn/xxxxx'
 			let i = this.indexOf('/', 11) -3, //4: g.cn; 11:7+4
 			j = this.indexOf(ml.slice(2), 7);
-			return -1 !== j && j < i;
+			return j > 6 && j < i;
 		}
 		if (ml[0] === '|')
 			return this.startsWith(ml.slice(1));
@@ -49,7 +49,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 		/^http:\/\/v\.163\.com\/special\/.+\.xml/,
 		/^http:\/\/www\.iqiyi\.com\/common\/flashplayer\/\d+\/(\w{32}|cornersign.+)\.swf/,//pause
 		'||.letvimg.com/',
-		/^http:\/\/(\d+\.){3}(\d{1,3}\/){4}letv-gug\/\d{1,3}\/ver.+\.mp4\?/,
+		/\/\/(\d+\.){3}(\d{1,3}\/){4}letv-gug\/\d{1,3}\/ver_/,
 	],
 	swfWhiteList = [//gpu加速白名单
 		'||.pdim.gs/static/',//熊猫直播
@@ -131,7 +131,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
                     let x = http.notificationCallbacks ||
 						http.loadGroup.notificationCallbacks;
 					if (x) return x.getInterface(Ci.nsILoadContext);
-						// x.getInterface(Ci.nsIDOMNode)//nsIDOMNode无定义
+						// x.getInterface(Ci.nsIDOMElement);
                 } catch(e) {}
             }
             return null;
@@ -155,7 +155,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 			try {
 				return http.getResponseHeader(field).includes(partVal);
             } catch(e) {
-				Cu.reportError(e);
+				//Cu.reportError(e);
 				return !1;
 			}
 		},
@@ -168,7 +168,8 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 				return;
 			(p instanceof Ci.nsIDOMHTMLEmbedElement) ? p.setAttribute('wmode', 'gpu')
 				: this.setFlashParam(p, 'wmode', 'gpu');
-			p.parentNode.replaceChild(p.cloneNode(true), p);
+			//p.parentNode.replaceChild(p.cloneNode(true), p);导致shouldLoad无限循环
+			this.refreshElem(p);
 		},
 		isPlayer: function(p, url) {
 			if (swfWhiteList.some(x => url.mixMatchUrl(x))) return !0;
@@ -179,6 +180,15 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 			if (p instanceof Ci.nsIDOMHTMLEmbedElement)
 				return p.matches('[allowFullScreen]');
 			return /"allowfullscreen"/i.test(p.innerHTML);
+		},
+		refreshElem: function(o) {
+			let s = o.style.display;
+			o.style.display = 'none';
+			setTimeout(() => {
+				s ? o.style.display = s : o.style.removeProperty('display');
+				if ('' === o.getAttribute('style'))
+					o.removeAttribute('style');
+			}, 9);
 		},
 		setFlashParam: function(p, name, v) {
 			let e = p.querySelector('embed');
@@ -253,6 +263,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 		filter: function(http) {
 			let s = http.URI.spec.toLowerCase();
 			if (s in this.blockUrls) {
+				//log(http.contentType);
 				let i = this.blockUrls[s];
 				if (typeof i.filter === 'function') i.filter(http);
 				else Utils.block(http, i.secured);
@@ -263,7 +274,6 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 			let playerUrl = (node instanceof Ci.nsIDOMHTMLEmbedElement) ?
 				node.src : node.data || node.children.movie.value;
 			playerUrl = playerUrl.toLowerCase();
-			//Cu.reportError(`${node}, ${url}`);
 			for (let i of FILTERS) {
 				if (i.cover && url.mixMatchUrl(i.cover)) {
 					if (this.matchPlayer(i, playerUrl)) {
@@ -316,7 +326,7 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 			}
 
 			if (contentType === 5) {//objects
-				//Application.console.log(`${node}, ${url}`);
+				//log(node, url);
 				this.doPlayer(url, node);
 			}
 			else if (contentType === 12) {//object_subrequest
