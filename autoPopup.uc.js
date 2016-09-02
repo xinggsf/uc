@@ -10,7 +10,7 @@
 // @startup        onAutoPopup.startup();
 // @shutdown       onAutoPopup.shutdown();
 // @author         xinggsf
-// @version        2016.6.13
+// @version        2016.9.2
 // @note  修改Profiles\chrome\Local\_autoPopup.js配置文件可实现定制化
 // ==/UserScript==
 -function() {
@@ -221,7 +221,7 @@ class AutoPop {
 		let a = ppmManager.act;
 		if (!a || !a.ppm) return !1;
 		if (e.nodeName === 'menuitem' || e === a.btn || a.frameURI === e.baseURI ||
-			a.ppm.contains(e) || e.closest('vbox.panel-arrowcontainer,popupset'))
+			a.ppm.contains(e) || e.closest('vbox.panel-arrowcontainer,menupopup,popupset'))
 			return !0;
 		if (a.ppm.id !== idWidgetPanel) return !1;
 		//console.log(e, e.ownerDocument);
