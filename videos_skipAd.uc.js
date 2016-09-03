@@ -48,6 +48,8 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 		/^http:\/\/v\.163\.com\/special\/.+\.xml/,
 		'||.letvimg.com/',
 		//^http:\/\/(\d+\.){3}\d+\/(\d{1,3}\/){3}letv-gug\/\d{1,3}\/ver.+\.mp4\?/,
+		/^http:\/\/www\.iqiyi\.com\/common\/flashplayer\/201\d{5}\/\w{32}\.swf$/,//pause
+		/^http:\/\/pic\d\.qiyipic\.com\/common\/201\d{5}\/\w{32}\.jpg$/,//pause ||qiyipic.com/common/201*.jpg|$object-subrequest
 	],
 	FILTERS = [
 		{
