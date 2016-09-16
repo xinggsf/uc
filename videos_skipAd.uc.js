@@ -55,7 +55,7 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 		{
 			'id': 'youku',
 			'player': [
-				/^http:\/\/static\.youku\.com\/v.+(?:play|load)er.*\.swf/,
+				//^http:\/\/static\.youku\.com\/v.+(?:play|load)er.*\.swf/,
 				'|http://player.youku.com/player.php/sid/',
 				'|http://cdn.aixifan.com/player/cooperation/acfunxyouku.swf',
 			],
@@ -72,7 +72,11 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 			'url': /^http:\/\/(\w+\.){3}\w+\/videos\/other\/\d+\/.+\.(f4v|hml)/
 		},{
 			'id': 'sohu',
-			'player': /^http:\/\/tv\.sohu\.com\/upload\/swf\/.+\/main\.swf/,
+			'player': [
+				/^http:\/\/tv\.sohu\.com\/upload\/swf\/.+\/main\.swf/,
+				/^http:\/\/(\d{1,3}\.){3}\d{1,3}\/wp8player\/main\.swf/,
+				'|http://static.hdslb.com/sohu.swf',
+			],
 			'url': '|http://v.aty.sohu.com/v',
 			'secured': true
 		},
@@ -80,8 +84,7 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 	HTML5_FILTERS = [
 		{//音悦台MV去黑屏
 			'id': 'yinyuetai',
-			'url': '|http://hc.yinyuetai.com/partner/yyt/',
-			'secured': true
+			'url': '|http://hc.yinyuetai.com/partner/yyt/'
 		},
 	],
 	swfWhiteList = [//gpu加速白名单
@@ -211,12 +214,13 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 			if (s in this.blockUrls) {
 				let i = this.blockUrls[s];
 				Utils.block(http, i.secured);
+				log('已过滤： ' +s);
 				delete this.blockUrls[s];
 			}
 		},
 		preFilter: function(node, url) {
 			if (!this.nodeMap.has(node)) return;
-			log(node, url);
+			//log(node, url);
 			for (let i of FILTERS) {
 				if (i.cover && url.mixMatchUrl(i.cover)) {
 					this.nodeMap.set(node, 0);
@@ -258,7 +262,7 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 			} */
 			if (contentType !==5 && contentType !==12 && (node instanceof Ci.nsIDOMHTMLObjectElement || node instanceof Ci.nsIDOMHTMLEmbedElement))
 			{
-				//Fix type for object_subrequest misrepresented as media/images/other..etc
+				//Fix type for object_subrequest misrepresented as media/images/other ..etc
 				if (!/\.swf(?:$|\?)/.test(url))
 					contentType = 12;
 				//Fix type for objects misrepresented as frames or images
@@ -267,6 +271,7 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 			}
 
 			if (contentType === 5) {//objects
+				//log(contentType, url);
 				this.doPlayer(url, node);
 			}
 			else if (contentType === 12) {//object_subrequest
