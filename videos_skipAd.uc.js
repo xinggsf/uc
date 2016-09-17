@@ -3,7 +3,7 @@
 // @description     视频站去广告
 // @include         main
 // @author          xinggsf
-// @version         2016.9.3
+// @version         2016.9.17
 // @homepage        http://bbs.kafan.cn/thread-2048252-1-1.html
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/videos_skipAd.uc.js
 // @startup         videos_skipAd.startup();
@@ -117,7 +117,7 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 				return;
 			(p instanceof Ci.nsIDOMHTMLEmbedElement) ? p.setAttribute('wmode', 'gpu')
 				: this.setFlashParam(p, 'wmode', 'gpu');
-			this.refreshElem(p);
+			//this.refreshElem(p);
 			//p.parentNode.replaceChild(p.cloneNode(true), p);
 		},
 		isPlayer: function(p, url) {
