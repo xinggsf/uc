@@ -1,9 +1,11 @@
 // ==UserScript==
-// @name UserAgentChangeModLite.uc.js
-// @namespace http://www.sephiroth-j.de/mozilla/
+// @name UserAgentChangeModLite.uc
+// @namespace UserAgentChangeModLite_xinggsf
+// @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/UserAgentChanger.uc.js
 // @charset     utf-8
-// @note  2016-10-4 modify by xinggsf: 自定义站点全部使用正则表达式；[fix bug] 新增自定义站点并重载配置后出错
-// @note  2016-09-26 modify by xinggsf: [fix bug] click blank link
+// @note  2016-10-6 xinggsf: 完善 _blank link 单击事件的处理
+// @note  2016-10-4 xinggsf: 自定义站点全部使用正则表达式；[fix bug] 新增自定义站点并重载配置后出错
+// @note  2016-09-26 xinggsf: [fix bug] click blank link
 // @note  modify by lastdream2013 at 20130616 mino fix
 // @note  modify by lastdream2013 at 20130409 sitelist : change SITELIST idx to Name
 // @include chrome://browser/content/browser.xul
@@ -41,7 +43,7 @@ var ucjs_UAChanger = {
 	Current_idx : 0,
 
 	init : function () {
-		this.winList = new WeakSet();
+		this.clickUrl = {};
 		this.reload();
 		this.mkData(); // UA データ(UA_LIST)を作る
 		var uaBtn = document.createElement("toolbarbutton");
@@ -195,14 +197,15 @@ var ucjs_UAChanger = {
 			}
 		}
 		else {
-			let ua, blankWin = subject.content,// .content取chrome窗口的网页窗口
+			let blankWin = subject.content,// .content取chrome窗口的网页窗口
 			url = blankWin.document.URL;
-			console.log(url, blankWin.navigator.userAgent);
-			if (!this.winList.has(blankWin) && (ua = this.checkUARule(url)) ) {
-				this.winList.add(blankWin);
-				gBrowser.stop();
-				gBrowser.reload();
-				return;
+			//console.log(url, blankWin.navigator.userAgent);
+			if (this.nextBlankUA && url.startsWith('about:')) {
+				Object.defineProperty(XPCNativeWrapper.unwrap(blankWin.navigator), "userAgent", {
+					value : this.nextBlankUA,
+					enumerable : true
+				});
+				this.nextBlankUA = null;
 			}
 		}
 	},
@@ -282,10 +285,11 @@ var ucjs_UAChanger = {
 		menu.appendChild(ppm);
 	},
 	observe : function (subject, topic, data) {
-		if (topic != "http-on-modify-request")
-			return;
-		let http = subject.QueryInterface(Ci.nsIHttpChannel);
-		let ua = this.checkUARule(http.URI.spec);
+		if (topic != "http-on-modify-request") return;
+		let http = subject.QueryInterface(Ci.nsIHttpChannel),
+		url = http.URI.spec,
+		ua = this.clickUrl[url] || this.checkUARule(url);
+		if (this.clickUrl[url]) delete this.clickUrl[url];
 		if (ua) http.setRequestHeader("User-Agent", ua, false);
 	},
 	handleEvent : function (aEvent) {
@@ -293,6 +297,15 @@ var ucjs_UAChanger = {
 		var menu = document.getElementById("ucjs_UserAgentChanger");
 		var uacMenu = document.getElementById("uac_popup");
 		switch (aEvent.type) {
+		case "click":
+            if (!aEvent.ctrlKey && 0 === aEvent.button) {
+                let ua, a = aEvent.target.closest('a[href][target=_blank]');
+                if (a && (ua = this.checkUARule(a.href))) {
+					this.clickUrl[a.href] = ua;
+					this.nextBlankUA = ua;
+				}
+            }
+			break;
 		case "popupshowing":
 			// コンテクスト・メニュー・ポップアップ時にチェック・マークを更新する
 			var menu = aEvent.target;
