@@ -26,7 +26,8 @@ var ucjs_UAChanger = {
 	ADD_OTHER_FX : true,
 	// true:自动添加其他版本firefox的ua  false:不添加
 	//2种版本firefox，下面请勿修改
-	EXT_FX_LIST : [{
+	EXT_FX_LIST : [
+		{
 			name : "Firefox4.0",
 			ua : "Mozilla/5.0 (Windows; Windows NT 6.1; rv:2.0b2) Gecko/20100720 Firefox/4.0b2",
 			label : "Fx4.0",
@@ -36,7 +37,8 @@ var ucjs_UAChanger = {
 			ua : "Mozilla/5.0 (Windows; U; Windows NT 5.1; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8",
 			label : "Fx3.6",
 			img : ""
-		}, ],
+		}
+	],
 	// ----------------------
 	// UA リストのインデックス
 	def_idx : 0,
@@ -46,7 +48,7 @@ var ucjs_UAChanger = {
 		this.clickUrl = {};
 		this.reload();
 		this.mkData(); // UA データ(UA_LIST)を作る
-		var uaBtn = document.createElement("toolbarbutton");
+		let uaBtn = document.createElement("toolbarbutton");//若添加到菜单可改为创建menu，相应class属性得改为menu-iconic
 		uaBtn.setAttribute("id", "ucjs_UserAgentChanger");
 		uaBtn.setAttribute('type', 'menu');
 		uaBtn.setAttribute('class', 'toolbarbutton-1 chromeclass-toolbar-additional');
@@ -54,37 +56,34 @@ var ucjs_UAChanger = {
 		uaBtn.setAttribute("tooltiptext", '左键：弹出菜单\n中键：重载配置\n右键：编辑配置');
 		uaBtn.setAttribute("image", this.UA_LIST[this.def_idx].img);
 		uaBtn.setAttribute('onclick', 'if (event.button == 2) {event.preventDefault();closeMenus(event.currentTarget); ucjs_UAChanger.edit();}if(event.button == 1) { ucjs_UAChanger.reload(true);}');
-		var insPos = document.getElementById('urlbar-icons');
+		let insPos = document.getElementById('urlbar-icons');
 		insPos.appendChild(uaBtn);
-		this.mkPanel(); // 生成菜单和面板
+		this.mkPanel(); // 生成菜单、面板
 		this.setSiteIdx();
 
-		var os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
+		let os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
 		os.addObserver(this, "http-on-modify-request", false);
-		os.addObserver(this.onDocumentCreated.bind(this), "content-document-global-created", false);
-		var contentArea = document.getElementById("appcontent");
+		os.addObserver(this, "content-document-global-created", false);
+		let contentArea = document.getElementById("appcontent");
 		contentArea.addEventListener("load", this, true);
 		contentArea.addEventListener("select", this, false);
 		contentArea.addEventListener("click", this, false);
-		var contentBrowser = this.getContentBrowser();
+		let contentBrowser = this.getContentBrowser();
 		contentBrowser.tabContainer.addEventListener("TabClose", this, false);
 		window.addEventListener("unload", this, false);
 		window.getBrowser().addProgressListener(this);
 	},
 	checkUARule : function (url) {
 		for (let i of this.SITE_LIST) {
-			if (i.url.test(url)) {
-				let ua = this.UA_LIST[i.idx].ua;
-				return ua;
-			}
+			if (i.url.test(url)) return this.UA_LIST[i.idx].ua;
 		}
 		return null;
 	},
 	reload : function (isAlert) {
-		var data = this.importUserAgentChange();
+		let data = this.importUserAgentChange();
 		if (!data)
 			return this.alert('Load Error: 配置文件不存在');
-		var sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
+		let sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
 		try {
 			Cu.evalInSandbox(data, sandbox, "1.8");
 		} catch (e) {
@@ -98,32 +97,31 @@ var ucjs_UAChanger = {
 			document.getElementById("ucjs_UserAgentChanger").removeChild(document.getElementById("uac_popup"));
 			this.mkData();
 			this.mkPanel();
-
 		} catch (e) {}
 		this.setSiteIdx();
 		if (isAlert)
 			this.alert('配置已经重新载入');
 	},
 	alert : function (aString, aTitle) {
-		Cc['@mozilla.org/alerts-service;1'].getService(Ci.nsIAlertsService).showAlertNotification("", aTitle || "UserAgentChanger", aString, false, "", null);
+		Cc['@mozilla.org/alerts-service;1'].getService(Ci.nsIAlertsService)
+			.showAlertNotification("", aTitle || "UserAgentChanger", aString, false, "", null);
 	},
 
 	userAgentChangeFile : function () {
-		var aFile = Services.dirsvc.get("UChrm", Ci.nsILocalFile);
+		let aFile = Services.dirsvc.get("UChrm", Ci.nsILocalFile);
 		aFile.appendRelativePath("Local");
 		aFile.appendRelativePath("_userAgentChange.js");
-		if (!aFile.exists() || !aFile.isFile())
-			return null;
-		return this.file = aFile;
+		if (!aFile.exists() || !aFile.isFile()) return null;
+		return aFile;
 	},
 
 	importUserAgentChange : function () {
-		var file = this.userAgentChangeFile();
-		var fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
-		var sstream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
+		let file = this.userAgentChangeFile();
+		let fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
+		let sstream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
 		fstream.init(file, -1, 0, 0);
 		sstream.init(fstream);
-		var data = sstream.read(sstream.available());
+		let data = sstream.read(sstream.available());
 		try {
 			data = decodeURIComponent(escape(data));
 		} catch (e) {}
@@ -133,10 +131,10 @@ var ucjs_UAChanger = {
 	},
 
 	edit : function () {
-		var aFile = this.userAgentChangeFile();
+		let aFile = this.userAgentChangeFile();
 		if (!aFile || !aFile.exists() || !aFile.isFile())
 			return;
-		var editor;
+		let editor;
 		try {
 			editor = Services.prefs.getComplexValue("view_source.editor.path", Ci.nsILocalFile);
 		} catch (e) {
@@ -144,13 +142,13 @@ var ucjs_UAChanger = {
 			toOpenWindowByType('pref:pref', 'about:config?filter=view_source.editor.path');
 			return;
 		}
-		var UI = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
+		let UI = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
 		UI.charset = window.navigator.platform.toLowerCase().indexOf("win") >= 0 ? "gbk" : "UTF-8";
-		var process = Cc['@mozilla.org/process/util;1'].createInstance(Ci.nsIProcess);
+		let process = Cc['@mozilla.org/process/util;1'].createInstance(Ci.nsIProcess);
 
 		try {
-			var path = UI.ConvertFromUnicode(aFile.path);
-			var args = [path];
+			let path = UI.ConvertFromUnicode(aFile.path);
+			let args = [path];
 			process.init(editor);
 			process.run(false, args, args.length);
 		} catch (e) {
@@ -159,7 +157,7 @@ var ucjs_UAChanger = {
 	},
 	getPlatformString: function(userAgent) {
 		if (!userAgent) return;
-		var s = userAgent.toLowerCase();
+		let s = userAgent.toLowerCase();
 		if (s.indexOf("Win64") > -1) return "Win64";
 		if (s.indexOf("windows") > -1) return "Win32";
 		if (s.indexOf("android") > -1) return "Linux armv7l";
@@ -169,52 +167,11 @@ var ucjs_UAChanger = {
 		if (s.indexOf("mac os x") > -1) return "MacIntel";
 	},
 
-	onDocumentCreated : function (subject, topic, data) {
-		var aSubject, aChannel;
-		if (subject.defaultView) aSubject = subject.defaultView;
-		if (subject.QueryInterface && subject.document) {//subject可能是iframe
-			aSubject = subject;
-		}
-		if (aSubject) aChannel = aSubject.QueryInterface(Ci.nsIInterfaceRequestor)
-			.getInterface(Ci.nsIWebNavigation)
-			.QueryInterface(Ci.nsIDocShell)
-			.currentDocumentChannel;
-		if (aChannel instanceof Ci.nsIHttpChannel) {
-			var navigator = aSubject.navigator;
-			var ua = this.checkUARule(aChannel.URI.spec) || aChannel.getRequestHeader("User-Agent");
-			//console.log(aChannel.URI.spec, ua);
-			if (navigator.userAgent !== ua)
-				Object.defineProperty(XPCNativeWrapper.unwrap(navigator), "userAgent", {
-					value : ua,
-					enumerable : true
-				});
-			var platform = this.getPlatformString(ua);
-			if (platform) {
-				Object.defineProperty(XPCNativeWrapper.unwrap(navigator), 'platform', {
-					value: platform,
-					enumerable: true
-				});
-			}
-		}
-		else {
-			let blankWin = subject.content,// .content取chrome窗口的网页窗口
-			url = blankWin.document.URL;
-			//console.log(url, blankWin.navigator.userAgent);
-			if (this.nextBlankUA && url.startsWith('about:')) {
-				Object.defineProperty(XPCNativeWrapper.unwrap(blankWin.navigator), "userAgent", {
-					value : this.nextBlankUA,
-					enumerable : true
-				});
-				this.nextBlankUA = null;
-			}
-		}
-	},
-
 	// UA データを作る
 	mkData : function () {
-		var ver = this.getVer(); // 現在使っている Firefox のバージョン
+		let ver = this.getVer(); // 現在使っている Firefox のバージョン
 		// 現在使っている Firefox のデータを作る
-		var tmp = [];
+		let tmp = [];
 		tmp.name = "Firefox" + ver;
 		tmp.ua = "";
 		tmp.img = this.NOW_UA_IMG;
@@ -231,9 +188,9 @@ var ucjs_UAChanger = {
 			}
 		}
 		// 起動時の UA を 初期化 (general.useragent.override の値が有るかチェック 07/03/02)
-		var preferencesService = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefService).getBranch("");
-		if (preferencesService.getPrefType("general.useragent.override") != 0) {
-			let ua =preferencesService.getCharPref("general.useragent.override");
+		let ps = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefService).getBranch("");
+		if (ps.getPrefType("general.useragent.override") != 0) {
+			let ua =ps.getCharPref("general.useragent.override");
 			this.def_idx = this.UA_LIST.findIndex(x => ua === x.ua);
 			if (this.def_idx <0) this.def_idx = 0;
 		}
@@ -285,17 +242,54 @@ var ucjs_UAChanger = {
 		menu.appendChild(ppm);
 	},
 	observe : function (subject, topic, data) {
-		if (topic != "http-on-modify-request") return;
-		let http = subject.QueryInterface(Ci.nsIHttpChannel),
-		url = http.URI.spec,
-		ua = this.clickUrl[url] || this.checkUARule(url);
-		if (this.clickUrl[url]) delete this.clickUrl[url];
-		if (ua) http.setRequestHeader("User-Agent", ua, false);
+		if (topic === "http-on-modify-request") {
+			let http = subject.QueryInterface(Ci.nsIHttpChannel);
+			let ua = this.checkUARule(http.URI.spec);
+			if (ua) http.setRequestHeader("User-Agent", ua, false);
+		}
+		else if (topic === "content-document-global-created") {
+			let aSubject, aChannel;
+			if (subject.defaultView) aSubject = subject.defaultView;
+			if (subject.QueryInterface && subject.document) {//subject可能是iframe
+				aSubject = subject;
+			}
+			if (aSubject) aChannel = aSubject.QueryInterface(Ci.nsIInterfaceRequestor)
+				.getInterface(Ci.nsIWebNavigation)
+				.QueryInterface(Ci.nsIDocShell)
+				.currentDocumentChannel;
+			if (aChannel instanceof Ci.nsIHttpChannel) {
+				let navigator = aSubject.navigator;
+				let ua = this.checkUARule(aChannel.URI.spec) || aChannel.getRequestHeader("User-Agent");
+				//console.log(aChannel.URI.spec, ua);
+				if (navigator.userAgent !== ua)
+					Object.defineProperty(XPCNativeWrapper.unwrap(navigator), "userAgent", {
+						value : ua,
+						enumerable : true
+					});
+				let platform = this.getPlatformString(ua);
+				if (platform) {
+					Object.defineProperty(XPCNativeWrapper.unwrap(navigator), 'platform', {
+						value: platform,
+						enumerable: true
+					});
+				}
+			}
+			else {
+				let ua, blankWin = subject.content,// .content取chrome窗口的网页窗口
+				url = blankWin.document.URL;
+				//console.log(url, blankWin.navigator.userAgent);
+				if (this.nextBlankUA && url.startsWith('about:')) {
+					Object.defineProperty(XPCNativeWrapper.unwrap(blankWin.navigator), "userAgent", {
+						value : this.nextBlankUA,
+						enumerable : true
+					});
+					this.nextBlankUA = null;
+				}
+			}
+		}
 	},
 	handleEvent : function (aEvent) {
-		var contentBrowser = this.getContentBrowser();
-		var menu = document.getElementById("ucjs_UserAgentChanger");
-		var uacMenu = document.getElementById("uac_popup");
+		let contentBrowser;
 		switch (aEvent.type) {
 		case "click":
             if (!aEvent.ctrlKey && 0 === aEvent.button) {
@@ -308,8 +302,7 @@ var ucjs_UAChanger = {
 			break;
 		case "popupshowing":
 			// コンテクスト・メニュー・ポップアップ時にチェック・マークを更新する
-			var menu = aEvent.target;
-			Array.prototype.forEach.call(menu.childNodes, (k, i) => {
+			Array.prototype.forEach.call(aEvent.target.childNodes, (k, i) => {
 				if (i == this.Current_idx) {
 					k.setAttribute("style", 'font-weight: bold;');
 					k.style.color = 'red';
@@ -322,54 +315,57 @@ var ucjs_UAChanger = {
 			});
 			break;
 		case "load":
-			// SITE_LIST に登録された URL の場合
 		case "select":
 		case "TabClose":
+			contentBrowser = this.getContentBrowser();
 			let x = this.SITE_LIST.find(k => k.url.test(contentBrowser.currentURI.spec));
 			x =  x ? x.idx : this.def_idx;
 			this.setImage(x);
-
 			break;
+
 		case "unload":
-			var os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
+			let os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
 			os.removeObserver(this, "http-on-modify-request");
-			os.removeObserver(this.onDocumentCreated.bind(this), "content-document-global-created");
-			var contentArea = document.getElementById("appcontent");
+			os.removeObserver(this, "content-document-global-created");
+			let contentArea = document.getElementById("appcontent");
 			contentArea.removeEventListener("load", this, true);
 			contentArea.removeEventListener("select", this, false);
+			contentBrowser = this.getContentBrowser();
 			if (contentBrowser)
 				contentBrowser.tabContainer.removeEventListener("TabClose", this, false);
-			uacMenu.removeEventListener("popupshowing", this, false);
+			let ppm = document.getElementById("uac_popup");
+			ppm.removeEventListener("popupshowing", this, false);
 			window.removeEventListener("unload", this, false);
 			window.getBrowser().removeProgressListener(this);
 			break;
 		}
 	},
 	setUA : function (i) {
-		var preferencesService = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefService).getBranch("");
+		let ps = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefService).getBranch("");
 		if (i == 0) { // オリジナル UA にする場合
 			// 既にオリジナル UA の場合は何もしない
-			if (preferencesService.getPrefType("general.useragent.override") == 0)
+			if (ps.getPrefType("general.useragent.override") == 0)
 				return;
-			preferencesService.clearUserPref("general.useragent.override");
+			ps.clearUserPref("general.useragent.override");
 		} else { // 指定した UA にする場合
-			preferencesService.setCharPref("general.useragent.override", this.UA_LIST[i].ua);
+			ps.setCharPref("general.useragent.override", this.UA_LIST[i].ua);
 		}
 		this.def_idx = i;
 		this.setImage(i);
 	},
 	setImage : function (i) {
-		var menu = document.getElementById("ucjs_UserAgentChanger");
+		let menu = document.getElementById("ucjs_UserAgentChanger");
 
 		menu.setAttribute("image", this.UA_LIST[i].img);
+		menu.setAttribute("label", this.UA_LIST[i].name);
 		menu.style.padding = "0px 2px";
 
 		this.Current_idx = i;
 	},
 	// アプリケーションのバージョンを取得する(Alice0775 氏のスクリプトから頂きました。)
 	getVer : function () {
-		var info = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULAppInfo);
-		var ver = parseInt(info.version.substr(0, 3) * 10, 10) / 10;
+		let info = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULAppInfo);
+		let ver = parseInt(info.version.substr(0, 3) * 10, 10) / 10;
 		return ver;
 	},
 	setSiteIdx : function () {
@@ -382,10 +378,10 @@ var ucjs_UAChanger = {
 	},
 	// 現在のブラウザオブジェクトを得る。
 	getContentBrowser : function () {
-		var windowMediator = Cc["@mozilla.org/appshell/window-mediator;1"].getService(Ci.nsIWindowMediator);
-		var topWindowOfType = windowMediator.getMostRecentWindow("navigator:browser");
-		if (topWindowOfType)
-			return topWindowOfType.document.getElementById("content");
+		let wm = Cc["@mozilla.org/appshell/window-mediator;1"].getService(Ci.nsIWindowMediator);
+		let top = wm.getMostRecentWindow("navigator:browser");
+		if (top)
+			return top.document.getElementById("content");
 		return null;
 	}
 }
