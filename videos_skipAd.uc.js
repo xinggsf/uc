@@ -11,10 +11,7 @@
 // ==/UserScript
 
 /* 为去黑屏，请在ABP之类的过滤工具中添加免过滤规则：
-@@|http://hc.yinyuetai.com/partner/yyt/
 @@|http://v.aty.sohu.com/v$object-subrequest
-@@||atm.youku.com/v$object-subrequest
-@@||atm.youku.com/crossdomain.xml
 */
 if (!String.prototype.includes) {
 	String.prototype.includes = function(s) {
@@ -83,8 +80,8 @@ String.prototype.mixMatchUrl = function(ml) {//正则或ABP规则匹配网址
 	],
 	HTML5_FILTERS = [
 		{//音悦台MV去黑屏
-			'id': 'yinyuetai',
-			'url': '|http://hc.yinyuetai.com/partner/yyt/'
+			// 'id': 'yinyuetai',
+			// 'url': '|http://hc.yinyuetai.com/partner/yyt/'
 		},
 	],
 	swfWhiteList = [//gpu加速白名单
