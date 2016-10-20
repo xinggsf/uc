@@ -3,6 +3,7 @@
 // @namespace UserAgentChangeModLite_xinggsf
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/UserAgentChanger.uc.js
 // @charset     utf-8
+// @version     2016.10.20
 // @note  2016-10-6 xinggsf: 完善 _blank link 单击事件的处理
 // @note  2016-10-4 xinggsf: 自定义站点全部使用正则表达式；[fix bug] 新增自定义站点并重载配置后出错
 // @note  2016-09-26 xinggsf: [fix bug] click blank link
@@ -158,7 +159,7 @@ var ucjs_UAChanger = {
 	getPlatformString: function(userAgent) {
 		if (!userAgent) return;
 		let s = userAgent.toLowerCase();
-		if (s.indexOf("Win64") > -1) return "Win64";
+		if (s.indexOf("win64") > -1) return "Win64";
 		if (s.indexOf("windows") > -1) return "Win32";
 		if (s.indexOf("android") > -1) return "Linux armv7l";
 		if (s.indexOf("linux") > -1) return "Linux i686";
@@ -200,7 +201,7 @@ var ucjs_UAChanger = {
 		// UA パネルのコンテクストメニューを作る
 		let mi, ppm = document.createElement("menupopup");
 		ppm.setAttribute("id", "uac_popup");
-		this.UA_LIST.forEach((k, i) => {
+		for (let [i, k] of this.UA_LIST.entries()) {
 			if (k.name == "分隔线") {
 				mi = document.createElement("menuseparator");
 			} else {
@@ -227,7 +228,7 @@ var ucjs_UAChanger = {
 				mi.setAttribute("uac-generated", true);
 			}
 			ppm.appendChild(mi);
-		});
+		}
 		mi = document.createElement("menuseparator");
 		ppm.appendChild(mi);
 		mi = document.createElement("menuitem");
@@ -302,7 +303,8 @@ var ucjs_UAChanger = {
 			break;
 		case "popupshowing":
 			// コンテクスト・メニュー・ポップアップ時にチェック・マークを更新する
-			Array.prototype.forEach.call(aEvent.target.childNodes, (k, i) => {
+			//Array.prototype.forEach.call(aEvent.target.childNodes, (k, i) => {
+			for (let [i, k] of aEvent.target.childNodes.entries()) {
 				if (i == this.Current_idx) {
 					k.setAttribute("style", 'font-weight: bold;');
 					k.style.color = 'red';
@@ -312,7 +314,7 @@ var ucjs_UAChanger = {
 					k.setAttribute("style", 'font-weight: normal;');
 					k.style.color = 'black';
 				}
-			});
+			}
 			break;
 		case "load":
 		case "select":
@@ -369,9 +371,9 @@ var ucjs_UAChanger = {
 		return ver;
 	},
 	setSiteIdx : function () {
-		this.UA_LIST.forEach((k, i) => {
+		for (let [i, k] of this.UA_LIST.entries()) {
 			this.UANameIdxHash[k.name] = i;
-		});
+		}
 		for (let k of this.SITE_LIST) {
 			k.idx = this.UANameIdxHash[k.Name] || this.def_idx;
 		}
