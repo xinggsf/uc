@@ -9,7 +9,7 @@
 // @include chrome://browser/content/places/places.xul
 // @startup        tabPlusManager.startup();
 // @shutdown       tabPlusManager.shutdown();
-// @version 2017.5.20
+// @version 2017.5.22
 // @Note xinggsf 2017.5.20  修正新建标签按钮右键新开网址后弹出菜单，修正“关闭当前标签页回到左边标签”失效
 // @Note xinggsf 2016.5.15  用API判断是否为FX可用地址
 // @Note xinggsf 2015.12.18 增加右击新建按钮新开剪贴板中的网址
@@ -19,7 +19,35 @@
 
 (function () {
 	Cu.import('resource://gre/modules/Services.jsm');
-
+	/* 下列代码firefox 47+失效，注释之
+	// 新标签打开:书签、历史、搜索栏
+	try {
+		eval('openLinkIn=' + openLinkIn.toString().replace(
+				'w.gBrowser.selectedTab.pinned', '(!w.isTabEmpty(w.gBrowser.selectedTab) || $&)')
+			.replace(/&&\s+w\.gBrowser\.currentURI\.host != uriObj\.host/, ''));
+	} catch (e) {}
+	//地址栏新标签打开
+	try {
+	location=="chrome://browser/content/browser.xul" &&
+	eval("gURLBar.handleCommand="+gURLBar.handleCommand.toString().replace(/^\s*(load.+);/gm,
+	"if(/^javascript:/.test(url)||isTabEmpty(gBrowser.selectedTab)){loadCurrent();}else{this.handleRevert();gBrowser.loadOneTab(url, {postData: postData, inBackground: false, allowThirdPartyFixup: true});}"));
+	}catch(e){}
+	//自动关闭下载产生的空白标签
+	eval("gBrowser.mTabProgressListener = " + gBrowser.mTabProgressListener.toString().replace(/(?=var location)/, '\
+		if (aWebProgress.DOMWindow.document.documentURI == "about:blank"\
+		&& aRequest.QueryInterface(nsIChannel).URI.spec != "about:blank") {\
+		aWebProgress.DOMWindow.setTimeout(function() {\
+		!aWebProgress.isLoadingDocument && aWebProgress.DOMWindow.close();\
+		}, 100);\
+		}\
+	'));
+	// 关闭当前标签页回到左边标签，firefox 47+失效，改用tabclose事件
+	try {
+		eval("gBrowser._blurTab = " + gBrowser._blurTab.toString()
+			.replace('this.selectedTab = tab;',
+			"this.selectedTab = aTab.previousSibling || tab;"));
+	} catch (e) {}
+	*/
 	//中键点击bookmark菜单不关闭
 	try {
 		eval('BookmarksEventHandler.onClick =' + BookmarksEventHandler.onClick
@@ -32,6 +60,10 @@
 		//当地址栏失去焦点后恢复原来的地址
 		gURLBar.addEventListener("blur", function () {
 			this.handleRevert();
+		}, !1);
+		//中键点击地址栏自动复制网址
+		gURLBar.addEventListener("click", function (e) {
+			if (e.button === 1) goDoCommand('cmd_copy');
 		}, !1);
 		//当搜索栏失去焦点后清空
 		if (BrowserSearch.searchBar && !document.getElementById('omnibar-defaultEngine')) {
@@ -87,9 +119,14 @@
 				}
 				break;
 			case "click":
-				//默认中键关闭标签页
+				//中键恢复关闭的标签页,中键默认关闭标签页
+				if (ev.button === 1) {
+					ev.preventDefault();
+					this.window.undoCloseTab();
+					ev.stopPropagation();
+				}
 				//右键关闭标签页，ctrl+右键打开菜单
-				if (ev.button === 2 && t.tagName === "tab" && !ev.ctrlKey) {
+				else if (ev.button === 2 && t.tagName === "tab" && !ev.ctrlKey) {
 					ev.preventDefault();
 					this.window.gBrowser.removeTab(t);
 					ev.stopPropagation();
@@ -98,15 +135,20 @@
 			case 'contextmenu':
 				//右键点击新建按钮打开剪贴板中的网址
 				if (ev.button === 2 && ev.originalTarget.matches(".tabs-newtab-button")) {
-					const reg = /^([\w\-]+\.)+[a-z]{2,3}(:\d+)?(\/\S*)?$/i;
+					/*
+					openNewTabWith('about:blank');
+					gURLBar.select();
+					goDoCommand('cmd_paste');
+					gBrowser.loadOneTab(url, {inBackground:false});
+					*/
+					const reg = /^([\w\-]+\.)+[a-z]{2,3}(:\d+)?(\/\S*)?$/;
 					let url = readFromClipboard();
 					if (reg.test(url))
 						url = 'http://' + url;
 					try {
 						switchToTabHavingURI(url, true);
 					} catch (ex) {
-						url = 'http://cn.bing.com/search?q=' + encodeURIComponent(url);
-						switchToTabHavingURI(url, true);
+						BrowserSearch.loadSearchFromContext(url);
 					}
 					ev.preventDefault();
 					ev.stopPropagation();
@@ -123,8 +165,7 @@
 			function onWindowLoad() {
 				window.removeEventListener('load', onWindowLoad);
 				if (window.document.documentElement.getAttribute('windowtype') == 'navigator:browser') {
-					let obj = new TabPlus(window);
-					_winList.set(window, obj);
+					_winList.set(window, new TabPlus(window));
 				}
 			}
 			window.addEventListener('load', onWindowLoad);
@@ -132,8 +173,7 @@
 		onCloseWindow(xulWindow) {
 			const window = xulWindow.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow);
 			if (_winList.has(window)) {
-				const obj = _winList.get(window);
-				obj.destroy();
+				_winList.get(window).destroy();
 				_winList.delete(window);
 			}
 		},
@@ -145,10 +185,7 @@
 			const windows = Services.wm.getEnumerator('navigator:browser');
 			while (windows.hasMoreElements()) {
 				const domwindow = windows.getNext().QueryInterface(Ci.nsIDOMWindow);
-				if (domwindow != null) {
-					const obj = new TabPlus(domwindow);
-					_winList.set(domwindow, obj);
-				}
+				domwindow && _winList.set(domwindow, new TabPlus(domwindow));
 			}
 			Services.wm.addListener(WindowListener);
 		},

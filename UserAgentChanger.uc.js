@@ -3,7 +3,7 @@
 // @namespace UserAgentChangeModLite_xinggsf
 // @downloadUrl     https://raw.githubusercontent.com/xinggsf/uc/master/UserAgentChanger.uc.js
 // @charset     utf-8
-// @version     2016.10.20
+// @version     2017.5.22
 // @note  2016-10-6 xinggsf: 完善 _blank link 单击事件的处理
 // @note  2016-10-4 xinggsf: 自定义站点全部使用正则表达式；[fix bug] 新增自定义站点并重载配置后出错
 // @note  2016-09-26 xinggsf: [fix bug] click blank link
@@ -12,36 +12,13 @@
 // @include chrome://browser/content/browser.xul
 // ==/UserScript==
 
+Cu.import('resource://gre/modules/Services.jsm');
 var ucjs_UAChanger = {
 	//现有版本firefox的图标
 	NOW_UA_IMG : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAARCAYAAAA7bUf6AAABtUlEQVQ4ja2UP2hUQRDGJ2Ih2mnE1kotkrSCoATEwlIbtQgmJDzudlbBu3DvfYP3+KaylhQpLYOFCGIhgqC1TQJWmkQtUgSxuSYmilrcXXh3e4L/BqbZP7/Z/b7ZlQifU3BL4Z0/T25H81sSzX/8a4rC9wYH+VnhzyP8pZo/U/MnCj5UcEXNPyQQ+BdReKc3sBnNn0bz9Qh+jOALNe5UNryN4FIEl6oQhXf2IQp/E/P2ZABbwbwZCr8xXFXBNRGROtrnFf4tgUT4apbxsPRCwUYAW9F8vVL1uxqvi4io8UECqRunpBIKHAs5zyn4flADPu7O+0wC6W/OmhyvGSdCwTDKiVD4NRGRWsGTCWR6mgdFROaA4xl4Zsixr/tXsvJir95YAsmaHK/ocUrBhlp5af4Oj0Yje8JuzSwuHhERqefl5VHu3OwieGDB7ETNOKE5Lyi4UnGn0S/Ut3oIwndVYWdneUgLLkT4agQfBfDqgPDGV6nFXeXvyW+EFp6PbLbKke+LyNivAMG4nHRsNO6O6MwNLRyK9tl66+5pLcorCpZqfJ2sNe78r1fM2wpu/9V/YvykoP0E9a4dzemYDMIAAAAASUVORK5CYII=",
-	//其他版本firefox的图标
-	EXT_FX_LIST_IMG : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABVElEQVQ4jZ3SsSvtcRjH8Vcy3HQyGXQz3cGgm0GSQSZJBoN0p5MM8heYJKukMxgkk0Ey3gySZDDodJIkyaCTTqfb6aSbJLvh9xx+/Thn8KmnX9/f93nez9Pn+dJc7fgZ0d4i75N6MYVJDEZMxL/eVt1mMRYF3RhHLhULKKGAH1nACOpYxVwkjmUAXfiDM2xiOA2Yxiv+o4ob5CMpl4k87rCbBuzhCbW4LOEIS18ABnCB8zSgEt0ruMQJ1tHZBHCAh7QXjfHLOMayxPlscQ7z2MdLnInRG4AL7KAfo2HcrxRgK5q8oKMBOA0PqrhGMXwoYtvHSoewETm1tAeLQSzjPqbYx4xkfTn04RB/8Rj37+qSvINimFPGbRQUYuxSxHk0G5FRHs+Sh3IfoKpkMw/4F+A61rLFDc2FmU8RdR8GP8d3BW3NANATSWfRvYYriXm/WxV+S289KV50Q9KsmwAAAABJRU5ErkJggg==",
 
 	UANameIdxHash : [],
-
-	// ----- 下面设置开始 -----
-	// defautl: ステータスバーの右端に表示する
 	TARGET : null,
-	// 定义一个target，用来调整状态栏顺序,null为空
-	ADD_OTHER_FX : true,
-	// true:自动添加其他版本firefox的ua  false:不添加
-	//2种版本firefox，下面请勿修改
-	EXT_FX_LIST : [
-		{
-			name : "Firefox4.0",
-			ua : "Mozilla/5.0 (Windows; Windows NT 6.1; rv:2.0b2) Gecko/20100720 Firefox/4.0b2",
-			label : "Fx4.0",
-			img : ""
-		}, {
-			name : "Firefox3.6.8",
-			ua : "Mozilla/5.0 (Windows; U; Windows NT 5.1; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8",
-			label : "Fx3.6",
-			img : ""
-		}
-	],
-	// ----------------------
-	// UA リストのインデックス
 	def_idx : 0,
 	Current_idx : 0,
 
@@ -62,9 +39,8 @@ var ucjs_UAChanger = {
 		this.mkPanel(); // 生成菜单、面板
 		this.setSiteIdx();
 
-		let os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
-		os.addObserver(this, "http-on-modify-request", false);
-		os.addObserver(this, "content-document-global-created", false);
+		Services.obs.addObserver(this, "http-on-modify-request", false);
+		Services.obs.addObserver(this, "content-document-global-created", false);
 		let contentArea = document.getElementById("appcontent");
 		contentArea.addEventListener("load", this, true);
 		contentArea.addEventListener("select", this, false);
@@ -88,8 +64,7 @@ var ucjs_UAChanger = {
 		try {
 			Cu.evalInSandbox(data, sandbox, "1.8");
 		} catch (e) {
-			this.alert('Error: ' + e + '\n请重新检查配置文件');
-			return;
+			return this.alert('Error: ' + e + '\n请重新检查配置文件');
 		}
 		this.DISPLAY_TYPE = sandbox.DISPLAY_TYPE;
 		this.SITE_LIST = sandbox.SITE_LIST;
@@ -109,9 +84,7 @@ var ucjs_UAChanger = {
 	},
 
 	userAgentChangeFile : function () {
-		let aFile = Services.dirsvc.get("UChrm", Ci.nsILocalFile);
-		aFile.appendRelativePath("Local");
-		aFile.appendRelativePath("_userAgentChange.js");
+		let aFile = FileUtils.getFile("UChrm", ["local", "_userAgentChange.js"], false);
 		if (!aFile.exists() || !aFile.isFile()) return null;
 		return aFile;
 	},
@@ -167,38 +140,22 @@ var ucjs_UAChanger = {
 		if (s.indexOf("ipad") > -1) return "iPad";
 		if (s.indexOf("mac os x") > -1) return "MacIntel";
 	},
-
-	// UA データを作る
 	mkData : function () {
-		let ver = this.getVer(); // 現在使っている Firefox のバージョン
-		// 現在使っている Firefox のデータを作る
+		let ver = this.getVer();
 		let tmp = [];
 		tmp.name = "Firefox" + ver;
 		tmp.ua = "";
 		tmp.img = this.NOW_UA_IMG;
-		tmp.label = "Fx" + (this.ADD_OTHER_FX ? ver : "");
+		tmp.label = "Fx" + ver;
 		this.UA_LIST.unshift(tmp);
-		// Fx のバージョンを見て UA を追加する
-		if (this.ADD_OTHER_FX) {
-			if (ver == 3.6) { // Fx3.6 の場合 Fx4 を追加する
-				this.EXT_FX_LIST[0].img = this.EXT_FX_LIST_IMG;
-				this.UA_LIST.push(this.EXT_FX_LIST[0]);
-			} else { // Fx3.6 以外では Fx3.6 を追加する
-				this.EXT_FX_LIST[1].img = this.EXT_FX_LIST_IMG;
-				this.UA_LIST.push(this.EXT_FX_LIST[1]);
-			}
-		}
-		// 起動時の UA を 初期化 (general.useragent.override の値が有るかチェック 07/03/02)
-		let ps = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefService).getBranch("");
+		const ps = Services.prefs.getBranch("");
 		if (ps.getPrefType("general.useragent.override") != 0) {
 			let ua =ps.getCharPref("general.useragent.override");
 			this.def_idx = this.UA_LIST.findIndex(x => ua === x.ua);
 			if (this.def_idx <0) this.def_idx = 0;
 		}
 	},
-	// UA パネルを作る
 	mkPanel : function () {
-		// UA パネルのコンテクストメニューを作る
 		let mi, ppm = document.createElement("menupopup");
 		ppm.setAttribute("id", "uac_popup");
 		for (let [i, k] of this.UA_LIST.entries()) {
@@ -276,7 +233,10 @@ var ucjs_UAChanger = {
 				}
 			}
 			else {
-				let ua, blankWin = subject.content,// .content取chrome窗口的网页窗口
+				//console.info(subject);
+				let url, ua,
+				blankWin = subject.content || subject;// .content取chrome窗口的网页窗口,FX53中subject为window
+				if (!blankWin) return;
 				url = blankWin.document.URL;
 				//console.log(url, blankWin.navigator.userAgent);
 				if (this.nextBlankUA && url.startsWith('about:')) {
@@ -302,8 +262,6 @@ var ucjs_UAChanger = {
             }
 			break;
 		case "popupshowing":
-			// コンテクスト・メニュー・ポップアップ時にチェック・マークを更新する
-			//Array.prototype.forEach.call(aEvent.target.childNodes, (k, i) => {
 			for (let [i, k] of aEvent.target.childNodes.entries()) {
 				if (i == this.Current_idx) {
 					k.setAttribute("style", 'font-weight: bold;');
@@ -326,9 +284,8 @@ var ucjs_UAChanger = {
 			break;
 
 		case "unload":
-			let os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
-			os.removeObserver(this, "http-on-modify-request");
-			os.removeObserver(this, "content-document-global-created");
+			Services.obs.removeObserver(this, "http-on-modify-request");
+			Services.obs.removeObserver(this, "content-document-global-created");
 			let contentArea = document.getElementById("appcontent");
 			contentArea.removeEventListener("load", this, true);
 			contentArea.removeEventListener("select", this, false);
@@ -343,9 +300,8 @@ var ucjs_UAChanger = {
 		}
 	},
 	setUA : function (i) {
-		let ps = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefService).getBranch("");
+		let ps = Services.prefs.getBranch("");
 		if (i == 0) { // オリジナル UA にする場合
-			// 既にオリジナル UA の場合は何もしない
 			if (ps.getPrefType("general.useragent.override") == 0)
 				return;
 			ps.clearUserPref("general.useragent.override");
@@ -364,11 +320,8 @@ var ucjs_UAChanger = {
 
 		this.Current_idx = i;
 	},
-	// アプリケーションのバージョンを取得する(Alice0775 氏のスクリプトから頂きました。)
 	getVer : function () {
-		let info = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULAppInfo);
-		let ver = parseInt(info.version.substr(0, 3) * 10, 10) / 10;
-		return ver;
+		return Services.appinfo.version.slice(0, 3);
 	},
 	setSiteIdx : function () {
 		for (let [i, k] of this.UA_LIST.entries()) {
@@ -378,10 +331,8 @@ var ucjs_UAChanger = {
 			k.idx = this.UANameIdxHash[k.Name] || this.def_idx;
 		}
 	},
-	// 現在のブラウザオブジェクトを得る。
 	getContentBrowser : function () {
-		let wm = Cc["@mozilla.org/appshell/window-mediator;1"].getService(Ci.nsIWindowMediator);
-		let top = wm.getMostRecentWindow("navigator:browser");
+		let top = Services.wm.getMostRecentWindow("navigator:browser");
 		if (top)
 			return top.document.getElementById("content");
 		return null;
