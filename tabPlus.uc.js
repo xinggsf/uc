@@ -9,7 +9,7 @@
 // @include chrome://browser/content/places/places.xul
 // @startup        tabPlusManager.startup();
 // @shutdown       tabPlusManager.shutdown();
-// @version 2017.5.22
+// @version 2017.5.27
 // @Note xinggsf 2017.5.20  修正新建标签按钮右键新开网址后弹出菜单，修正“关闭当前标签页回到左边标签”失效
 // @Note xinggsf 2016.5.15  用API判断是否为FX可用地址
 // @Note xinggsf 2015.12.18 增加右击新建按钮新开剪贴板中的网址
@@ -21,10 +21,12 @@
 	Cu.import('resource://gre/modules/Services.jsm');
 	/* 下列代码firefox 47+失效，注释之
 	// 新标签打开:书签、历史、搜索栏
+	let s = openLinkIn.toString();
+	s = s.replace('w.gBrowser.selectedTab.pinned', '(!w.isTabEmpty(w.gBrowser.selectedTab) || $&)')
+		.replace(/&&\s+w\.gBrowser\.currentURI\.host != uriObj\.host/, '')
+		.replace(/loadInBackground = false;/g, 'loadInBackground = aInBackground;');
 	try {
-		eval('openLinkIn=' + openLinkIn.toString().replace(
-				'w.gBrowser.selectedTab.pinned', '(!w.isTabEmpty(w.gBrowser.selectedTab) || $&)')
-			.replace(/&&\s+w\.gBrowser\.currentURI\.host != uriObj\.host/, ''));
+		(new Function('openLinkIn = ' + s)());
 	} catch (e) {}
 	//地址栏新标签打开
 	try {
@@ -77,18 +79,50 @@
 		constructor(wnd) {
 			this.window = wnd;
 			this.tab = null;
-			wnd.gBrowser.tabContainer.addEventListener('mouseover', this, !1);
-			wnd.gBrowser.tabContainer.addEventListener('mouseout', this, !1);
-			wnd.gBrowser.tabContainer.addEventListener('click', this, !1);
-			wnd.gBrowser.tabContainer.addEventListener('TabClose', this, !1);
-			wnd.gBrowser.tabContainer.addEventListener('contextmenu', this, !1);
+			const c = wnd.gBrowser.tabContainer;
+			c.addEventListener('mouseover', this, !1);
+			c.addEventListener('mouseout', this, !1);
+			c.addEventListener('click', this, !1);
+			c.addEventListener('TabClose', this, !1);
+			c.addEventListener('contextmenu', this, !1);
+			const newTabBtn = this.window.document.getAnonymousElementByAttribute(c, "class", "tabs-newtab-button");
+			newTabBtn.setAttribute("tooltiptext","左键：新建标签页\n中键：恢复刚关闭的标签\n右键：新开剪贴板中的网址");
+			newTabBtn.removeAttribute("onclick");
+			newTabBtn.addEventListener('click', this.handleNewTabButton.bind(this), !0);
 		}
 		destroy(){
-			this.window.gBrowser.tabContainer.removeEventListener('mouseover', this);
-			this.window.gBrowser.tabContainer.removeEventListener('mouseout', this);
-			this.window.gBrowser.tabContainer.removeEventListener('click', this);
-			this.window.gBrowser.tabContainer.removeEventListener('TabClose', this);
-			this.window.gBrowser.tabContainer.removeEventListener('contextmenu', this);
+			const c = this.window.gBrowser.tabContainer;
+			c.removeEventListener('mouseover', this);
+			c.removeEventListener('mouseout', this);
+			c.removeEventListener('click', this);
+			c.removeEventListener('TabClose', this);
+			c.removeEventListener('contextmenu', this);
+			const newTabBtn = this.window.document.getAnonymousElementByAttribute(c, "class", "tabs-newtab-button");
+			newTabBtn.removeEventListener('click', this.handleNewTabButton.bind(this));
+		}
+		handleNewTabButton(ev) {
+			//if (ev.button === 0) this.window.BrowserOpenTab(ev);
+			if (ev.button === 1) {
+				this.window.undoCloseTab();
+			}
+			//右键点击新建按钮打开剪贴板中的网址
+			else if (ev.button === 2) {
+				/*
+				openNewTabWith('about:blank');
+				gURLBar.select();
+				goDoCommand('cmd_paste');
+				gBrowser.loadOneTab(url, {inBackground:false});
+				*/
+				const reg = /^([\w\-]+\.)+[a-z]{2,3}(:\d+)?(\/\S*)?$/i;
+				let url = readFromClipboard();
+				if (reg.test(url))
+					url = 'http://' + url;
+				try {
+					switchToTabHavingURI(url, true);
+				} catch (ex) {
+					BrowserSearch.loadSearchFromContext(url);
+				}
+			}
 		}
 		handleEvent(ev) {
 			const t = ev.target;
@@ -119,11 +153,15 @@
 				}
 				break;
 			case "click":
-				//中键恢复关闭的标签页,中键默认关闭标签页
 				if (ev.button === 1) {
-					ev.preventDefault();
-					this.window.undoCloseTab();
-					ev.stopPropagation();
+					console.log(t);
+					if (t.matches("tab")) {//复制tab的网址
+						let url = t.linkedBrowser.currentURI.spec;
+						//Services.clipboard.setData(url, ,);
+						Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString(url, !1);
+						ev.preventDefault();
+						ev.stopPropagation();
+					}
 				}
 				//右键关闭标签页，ctrl+右键打开菜单
 				else if (ev.button === 2 && t.tagName === "tab" && !ev.ctrlKey) {
@@ -132,24 +170,8 @@
 					ev.stopPropagation();
 				}
 				break;
-			case 'contextmenu':
-				//右键点击新建按钮打开剪贴板中的网址
-				if (ev.button === 2 && ev.originalTarget.matches(".tabs-newtab-button")) {
-					/*
-					openNewTabWith('about:blank');
-					gURLBar.select();
-					goDoCommand('cmd_paste');
-					gBrowser.loadOneTab(url, {inBackground:false});
-					*/
-					const reg = /^([\w\-]+\.)+[a-z]{2,3}(:\d+)?(\/\S*)?$/;
-					let url = readFromClipboard();
-					if (reg.test(url))
-						url = 'http://' + url;
-					try {
-						switchToTabHavingURI(url, true);
-					} catch (ex) {
-						BrowserSearch.loadSearchFromContext(url);
-					}
+			case "contextmenu":
+				if ((!ev.ctrlKey && t.matches('tab')) || ev.originalTarget.matches('.tabs-newtab-button')) {
 					ev.preventDefault();
 					ev.stopPropagation();
 				}
