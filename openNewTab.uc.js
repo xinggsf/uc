@@ -5,7 +5,7 @@
 // @include         chrome://browser/content/places/places.xul
 // @description     Open Bookmarks/History/Search in New Tab
 // @downloadURL     https://raw.githubusercontent.com/xinggsf/uc/master/openNewTab.uc.js
-// @version         1.3.1.1
+// @version         1.3.1.2
 // @Note xinggsf 2017.6.9  修改使之能用于FX53,修正BUG: vertical书签栏不能新开；搜索栏被移除导致脚本出错
 // ==/UserScript==
 (function() {
@@ -14,13 +14,13 @@
 
     function whereToOpenLinkMod() {
 	{
-		const b_bookmarks = true;
-		const b_history = true;
+		var b_bookmarks = true;
+		var b_history = true;
 
 		if (!e) return 'current';
-		const win = window.opener || window;
+		var win = window.opener || window;
 		if (win.isTabEmpty(win.gBrowser.mCurrentTab)) return 'current';
-		let node = e.originalTarget;
+		var node = e.originalTarget;
 		if (node.matches('.bookmark-item'))
 			return b_bookmarks ? 'tab' : 'current';
 		while (node) {
@@ -34,8 +34,8 @@
 				case 'history-panel':       // sidebar history
 					return b_history ? 'tab' : 'current';
 				case 'placeContent':        // library bookmarks&history
-					const collection = window.document.getElementById('searchFilter').getAttribute('collection');
-					const tab = collection === "bookmarks" && b_bookmarks || collection === "history" && b_history;
+					var collection = window.document.getElementById('searchFilter').getAttribute('collection');
+					var tab = collection === "bookmarks" && b_bookmarks || collection === "history" && b_history;
 					return tab ? 'tab' : 'current';
 			}
 			node = node.parentNode;
@@ -43,6 +43,7 @@
 		return 'current';
     }
 	}
+	// Inline function
 	const where_code = whereToOpenLinkMod.toString().replace(/^.*{|}$/g, '');
     if (location == 'chrome://browser/content/browser.xul') {
         /* :::: Open Bookmarks/History in New Tab :::: */
