@@ -10,12 +10,12 @@
 // @startup        onAutoPopup.startup();
 // @shutdown       onAutoPopup.shutdown();
 // @author         xinggsf
-// @version        2016.9.2
+// @version        2017.6.29
 // @note  修改Profiles\chrome\Local\_autoPopup.js配置文件可实现定制化
 // ==/UserScript==
 -function() {
 function clone(src){//浅克隆
-	if (!src) return src;
+	if (!src) return;
 	let r = src.constructor === Object ?
 		new src.constructor() :
 		new src.constructor(src.valueOf());
@@ -28,11 +28,8 @@ function clone(src){//浅克隆
 	r.valueOf = src.valueOf;
 	return r;
 }
-function $(id) {
-	return document.getElementById(id) ;
-}
 
-const setFile = ["local", "_autoPopup.js"],
+const $ = id => document.getElementById(id),
 idWidgetPanel = 'customizationui-widget-panel',
 
 ppmPos = ['after_start','end_before','before_start','start_before'];
@@ -59,7 +56,7 @@ function getPopupPos(elt) {
 
 let nDelay, blackIDs, whiteIDs;
 function loadUserSet() {
-	let aFile = FileUtils.getFile("UChrm", setFile, false);
+	let aFile = FileUtils.getFile("UChrm", ["local", "_autoPopup.js"], false);
 	if (!aFile.exists() || !aFile.isFile()) return;
 	let fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
 	let sstream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
@@ -71,7 +68,16 @@ function loadUserSet() {
 	} catch (e) {}
 	sstream.close();
 	fstream.close();
-	if (data) eval(data);
+	if (data) return eval(data);
+	/*
+	let sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
+	try {
+		Cu.evalInSandbox(data, sandbox, 'latest');
+	} catch (e) {
+		return;
+	}
+
+	{nDelay, blackIDs, whiteIDs} = sandbox; */
 }
 
 class MenuAct {//菜单动作基类
@@ -113,7 +119,9 @@ class MenuAct {//菜单动作基类
 		else this.btn.click();
 	}
 	close(){
-		if (this.ppm) {
+		if (idWidgetPanel === this.menuid)
+            gURLBar.click();
+        else if (this.ppm) {
 			if (this.ppm.hidePopup)
 				this.ppm.hidePopup();
 			else if (this.ppm.popupBoxObject)
@@ -224,10 +232,13 @@ class AutoPop {
 			a.ppm.contains(e) || e.closest('vbox.panel-arrowcontainer,menupopup,popupset'))
 			return !0;
 		if (a.ppm.id !== idWidgetPanel) return !1;
-		//console.log(e, e.ownerDocument);
-		if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
-			a.frameURI = e.getAttribute('src');
-		return e.closest('[panelopen=true]');
+		//console.log(e, e.ownerDocument, e.ownerDocument.location.href);
+		// if (e.ownerDocument === document && e.matches('iframe[src][type=content]'))
+			// a.frameURI = e.getAttribute('src');
+		// return e.closest('[panelopen=true]');
+		if (e.closest('[panelopen=true]')) return !0;
+        // chrome://*.html仍然是旧式的扩展，文档类型为XULDocument
+        return /^(moz-extension|chrome):\/\/.+\.html?$/i.test(e.ownerDocument.location.href);//e.ownerDocument instanceof HTMLDocument &&
 	}
 }
 btnManager = new class extends AutoPop {
@@ -303,7 +314,7 @@ window.onAutoPopup = {//事件处理“类”
 		prevElt = e;
 		btnManager.mouseOver(e);
 		ppmManager.mouseOver(e);
-	},
+	}
 }
 onAutoPopup.startup();
 
