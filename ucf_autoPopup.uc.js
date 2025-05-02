@@ -9,7 +9,7 @@
 // ==/UserScript==
 (async (
     delay = 300,
-    hidedelay = 800,
+    hidedelay = 800, //禁用自动隐藏，设为 0
     btnSelectors = [
         "#PanelUI-menu-button",
         "#library-button",
@@ -74,11 +74,12 @@
         this[e.type](e);
     },
     popuphidden({ target }) {
+        if (!this.prevBtn || target.localName === "tooltip") return;
         this.popups.delete(target);
         this.open_ = false;
     },
     popupshown({ target }) {
-        if (target.localName === "tooltip") return;
+        if (!this.prevBtn || target.localName === "tooltip") return;
 		target.addEventListener("mouseenter", this, {once:true});
 		target.addEventListener("mouseout", this, {once:true});
         this.open_ = true;
@@ -106,6 +107,7 @@
             .action.tabContext.get(gBrowser.selectedTab).popup;
     },
     setHideTimer() {
+        if (!hidedelay) return;
         clearTimeout(this.hidetimer);
         this.hidetimer = setTimeout(() => {
             this.hidePopup();

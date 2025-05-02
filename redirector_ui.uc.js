@@ -73,28 +73,30 @@
         observe(subject, topic, data, additional) {
             switch (topic) {
                 case "http-on-modify-request": {
-                    const channel = subject.QueryInterface(Ci.nsIHttpChannel);
-                    const redirectUrl = this.getRedirectUrl(channel.URI.spec);
-                    if (redirectUrl/* && !redirectUrl.resp*/) {
-                        channel.cancel(Cr.NS_BINDING_REDIRECTED); // NS_BINDING_ABORTED
-                        let loadingContext = (channel.notificationCallbacks || channel.loadGroup.notificationCallbacks).getInterface(Ci.nsILoadContext);
+                    const channel = ChannelWrapper.get(subject);
+                    // console.log(channel);
+                    const redirectUrl = this.getRedirectUrl(channel.channel.URI.spec);
+                    if (redirectUrl/* && !redirectUrl.resp*/) {						
+                        channel.channel.cancel(Cr.NS_BINDING_REDIRECTED); // NS_BINDING_ABORTED
+                        let loadingContext = (channel.channel.notificationCallbacks || channel.channel.loadGroup.notificationCallbacks).getInterface(Ci.nsILoadContext);
                         let webNavigation = loadingContext.topFrameElement.webNavigation;
                         let loadURI = webNavigation.fixupAndLoadURIString || webNavigation.loadURI;
                         loadURI.call(webNavigation, redirectUrl.url, {
                             triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({}),
                         });
-						/*
-                        channel.resume();
+                        /* 
+						channel.channel.suspend();
                         const newURI = Services.io.newURI(redirectUrl.url);
                         channel.redirectTo(newURI);
                         ChromeUtils.addProfilerMarker(
-                          "Extension Redirected",
-                          { category: "Network" },'xxx'
-                          //`${kind} ${finalURL} redirected to ${redirectUrl} by ${opts.addonId} (chanId: ${chanId})`
+							"Extension Redirected",
+							{ category: "Network" },
+							`${channel.type} ${channel.finalURL} redirected by uBlock0@raymondhill.net (chanId: ${channel.id})`
                         );
-                        channel.QueryInterface(Ci.nsIWritablePropertyBag)
-                            .setProperty("redirectedByExtension", '686e93c6-3cd9-4d8b-ae2d-909cb0e08cf3');
-                        channel.loadInfo.allowInsecureRedirectToDataURI = true; */
+                        channel.channel.QueryInterface(Ci.nsIWritablePropertyBag)
+                            .setProperty("redirectedByExtension", 'uBlock0@raymondhill.net');
+                        channel.loadInfo.allowInsecureRedirectToDataURI = true;
+                        channel.channel.resume(); */
                     }
                     break;
                 }
