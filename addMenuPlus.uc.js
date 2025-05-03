@@ -682,7 +682,7 @@ else {
                 else if (text)
                     this.copy(this.convertText(text));
             },
-            openCommand(event, url, aWhere, aAllowThirdPartyFixup = {}, aPostData, aReferrerInfo) {
+            openCommand(event, url, aWhere, aAllowThirdPartyFixup, aPostData, aReferrerInfo) {
                 const isJavaScriptURL = url.startsWith("javascript:");
                 const isWebURL = /^(f|ht)tps?:/.test(url);
                 if (aWhere?.includes('tab') && gBrowser.selectedTab.isEmpty) {

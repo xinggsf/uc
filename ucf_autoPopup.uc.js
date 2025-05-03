@@ -76,7 +76,7 @@
     popuphidden({ target }) {
         if (!this.prevBtn || target.localName === "tooltip") return;
         this.popups.delete(target);
-        this.open_ = false;
+        this.open_ = this.inMemu_ = this.popups.size > 0;
     },
     popupshown({ target }) {
         if (!this.prevBtn || target.localName === "tooltip") return;
