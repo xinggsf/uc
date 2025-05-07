@@ -5,7 +5,7 @@
 // @author         Ryan, ywzhaiqi, Griever
 // @include        main
 // @license        MIT
-// @compatibility  Firefox 72
+// @compatibility  Firefox 136
 // @charset        UTF-8
 // @version        0.2.1 r4
 // @shutdown       window.addMenu.destroy();
@@ -19,7 +19,7 @@
 /***** 説明 *****
  * _addMenu.js Demo: https://github.com/benzBrake/FirefoxCustomize/blob/master/userChromeJS/addMenuPlus/_addmenu.js
  */
-if (window === void 0 || globalThis !== window) {
+if (typeof window == "undefined" || globalThis !== window) {
     if (!Services.appinfo.remoteType) {
         this.EXPORTED_SYMBOLS = ["AddMenuParent"];
         try {
@@ -33,10 +33,10 @@ if (window === void 0 || globalThis !== window) {
                 },
                 allFrames: true,
                 messageManagerGroups: ["browsers"],
-                matches: ["*://*/*", "file:///*", "about:*", "view-source:*", "moz-extension://*/*", "resource://*/*"],
+                matches: ["*://*/*", "file:///*", "about:*", "view-source:*", "moz-extension://*/*"],
             };
             ChromeUtils.registerWindowActor("AddMenu", actorParams);
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e) }
 
         this.AddMenuParent = class extends JSWindowActorParent {
             receiveMessage ({ name, data }) {
@@ -50,9 +50,10 @@ if (window === void 0 || globalThis !== window) {
                         addMenu.setSelectedText(data.text);
                         break;
                     case "AM:FaviconLink":
-                        if (data.href !== void 0 && data.hash !== void 0) {
-                            win.gBrowser.tabs.filter(t => t.faviconHash === data.hash)
-                                .forEach(t => t.faviconUrl = data.href);
+                        if (data?.href && data.hash) {
+                            win.gBrowser.tabs.forEach(t => {
+                                t.faviconHash === data.hash && (t.faviconUrl = data.href)
+                            });
                         }
                         break;
                     case "AM:ExectueScriptEnd":
@@ -69,12 +70,12 @@ if (window === void 0 || globalThis !== window) {
 
         this.AddMenuChild = class extends JSWindowActorChild {
             actorCreated () {
-                const window = this.contentWindow;
+                const win = this.contentWindow;
                 if (window.addMenu) return;
-                window.addMenu = {};
-                const { console, document } = window;
-                const actor = window.windowGlobalChild.getActor("AddMenu");;
-                document.addEventListener("mouseup", function(event) {
+                win.addMenu = {};
+                const { console, document: doc } = window;
+                const actor = win.windowGlobalChild.getActor("AddMenu");;
+                doc.addEventListener("mouseup", function(event) {
                     var selectedText = getSelectedText();
                     if (selectedText) {
                         actor.sendAsyncMessage("AM:SetSeletedText", {
@@ -84,7 +85,7 @@ if (window === void 0 || globalThis !== window) {
                     }
                 });
 
-                document.addEventListener("contextmenu", function(event) {
+                doc.addEventListener("contextmenu", function(event) {
                     let data = {
                         onSvg: event.target.namespaceURI === "http://www.w3.org/2000/svg"
                     }
@@ -97,55 +98,53 @@ if (window === void 0 || globalThis !== window) {
 
                 function getSelectedText() {
                     var text = "";
-                    if (window.getSelection) {
-                        text = window.getSelection().toString();
-                    } else if (document.selection && document.selection.type != "Control") {
-                        text = document.selection.createRange().text;
+                    if (win.getSelection) {
+                        text = win.getSelection().toString();
+                    } else if (doc?.selection?.type != "Control") {
+                        text = doc.selection.createRange().text;
                     }
                     return text;
                 }
 
                 function isEditableElement() {
-                    var element = window.getSelection().focusNode.parentNode;
-                    return element.nodeName === "INPUT" || element.nodeName === "TEXTAREA" || element.isContentEditable;
+                    var el = win.getSelection().focusNode.parentNode;
+                    return el.isContentEditable || el.matches('input,textarea');
                 }
             }
             receiveMessage ({ name, data }) {
                 const win = this.contentWindow;
-                const console = win.console;
-                const doc = win.document;
+                const { console, document: doc } = win;
                 const actor = win.windowGlobalChild.getActor("AddMenu");
                 switch (name) {
-                    case "AM:GetFaviconLink":
-                        if (doc.location.href.startsWith("about:")) return;
-                        if (!"head" in doc) return;
-                        let link = doc.head.querySelector('[rel~="shortcut"],[rel="icon"]');
-                        let href = "";
-                        if (link) {
-                            href = processRelLink(link.getAttribute("href"));
-                        } else {
-                            href = `${doc.location.protocol}//${doc.location.host}/favicon.ico`;
-                        }
-                        actor.sendAsyncMessage("AM:FaviconLink", { href: href, hash: data.hash });
-                        function processRelLink(href) {
-                            if (href.startsWith("//")) {
-                                return doc.location.protocol + href;
-                            }
-                            if (/^(https?|chrome|resource|data):/.test(href)) {
-                                return href;
-                            }
-                            const { protocol, host } = doc.location;
-                            if (href.startsWith("./") || href.startsWith("/")) {
-                                return protocol + "//" + host + href.replace(/^\./, "");
-                            }
-                            return `${protocol}//${host}/${href}`;
-                        }
-                        break;
-                    case "AM:ExectueScript":
-                        if (data?.script) {
-                            eval('(' + decodeURIComponent(atob(data.script)) + ').call(this, doc, win, actor)');
-                        }
-                        break;
+				case "AM:GetFaviconLink":
+					if (!doc.head || doc.location.href.startsWith("about:")) return;
+					let link = doc.head.querySelector('[rel~="shortcut"],[rel="icon"]');
+					let href = "";
+					if (link) {
+						href = processRelLink(link.getAttribute("href"));
+					} else {
+						href = `${doc.location.protocol}//${doc.location.host}/favicon.ico`;
+					}
+					actor.sendAsyncMessage("AM:FaviconLink", { href, hash: data.hash });
+					function processRelLink(href) {
+						if (href.startsWith("//")) {
+							return doc.location.protocol + href;
+						}
+						if (/^(https?|chrome|resource|data):/.test(href)) {
+							return href;
+						}
+						const { protocol, host } = doc.location;
+						if (/^\.?\//.test(href)) {
+							return protocol + "//" + host + href.replace(/^\./, "");
+						}
+						return `${protocol}//${host}/${href}`;
+					}
+					break;
+				case "AM:ExectueScript":
+					if (data?.script) {
+						eval('(' + decodeURIComponent(atob(data.script)) + ').call(this, doc, win, actor)');
+					}
+					break;
                 }
             }
         }
@@ -178,7 +177,7 @@ else {
         } catch (e) {
             Cu.reportError(e);
         }
-    } catch (e) { console.error(e) }
+    } catch (e) { console.log(e) }
 
     (function(css, getURLSpecFromFile, loadText, versionGE, isFirefoxSupportedImageMime) {
         const {SelectionUtils} = ChromeUtils.importESModule("resource://gre/modules/SelectionUtils.sys.mjs");
@@ -247,7 +246,7 @@ else {
         const ADDMENU_LOCALE = _locale || "en-US";
 
         // 增加菜单类型请在这里加入插入点，名称不能是 ident 或者 group
-        var MENU_ATTRS = {
+        const MENU_ATTRS = {
             tab: {
                 insRef: $("context_closeTab"),
                 current: "tab",
@@ -261,19 +260,19 @@ else {
                 groupmenu: "PageGroup"
             },
             tool: {
-                insRef: $("prefSep") || $("webDeveloperMenu"),
+                insRef: $("#prefSep, #webDeveloperMenu"),
                 current: "tool",
                 submenu: "ToolMenu",
                 groupmenu: "ToolGroup"
             },
             app: {
-                insRef: $("appmenu-quit") || $("appMenu-quit-button") || $("appMenu-quit-button2") || $("menu_FileQuitItem"),
+                insRef: $("#appmenu-quit,#appMenu-quit-button,#appMenu-quit-button2,#menu_FileQuitItem"),
                 current: "app",
                 submenu: "AppMenu",
                 groupmenu: "AppGroup"
             },
             nav: {
-                insRef: $("toolbar-context-undoCloseTab") || $("toolbarItemsMenuSeparator"),
+                insRef: $("#toolbar-context-undoCloseTab, #toolbarItemsMenuSeparator"),
                 current: "nav",
                 submenu: "NavMenu",
                 groupmenu: "NavGroup"
@@ -282,13 +281,17 @@ else {
 
         window.addMenu = {
             _selectedText: "",
+            ContextMenu: { svg: null, onSvg: false },
+            error, log,
             get prefs() {
+                delete this.prefs;
                 return this.prefs = Services.prefs.getBranch("addMenu.")
             },
             get platform() {
-                return this.platform = AppConstants.platform;
+                return AppConstants.platform;
             },
             get FILE() {
+                delete this.FILE;
                 let path;
                 try {
                     path = this.prefs.getStringPref("FILE_PATH")
@@ -311,15 +314,14 @@ else {
                 return this.FILE = aFile;
             },
             get supportLocalization() {
-                return this.supportLocalization = typeof Localization === "function";
+                return typeof Localization == "function";
             },
             get locale() {
-                return this.locale = ADDMENU_LOCALE || "en-US";
+                return ADDMENU_LOCALE || "en-US";
             },
             get panelId() {
                 return this.panelId = Math.floor(Math.random() * 900000 + 99999);
             },
-            ContextMenu: { svg: null, onSvg: false },
             init() {
                 this.win = window;
                 // prepare regex
@@ -396,9 +398,7 @@ else {
                 $("menu_ToolsPopup").addEventListener("popupshowing", this, false);
 
                 // move menuitems to Hamburger menu when firstly clicks the PanelUI button
-                PanelUI.mainView.addEventListener("ViewShowing", this.moveToAppMenu, {
-                    once: true
-                });
+                PanelUI.mainView.addEventListener("ViewShowing", this.moveToAppMenu, { once: true });
 
                 // PanelUI 增加 CustomShowing 支持
                 PanelUI.mainView.addEventListener("ViewShowing", this);
@@ -407,7 +407,7 @@ else {
                     PanelUI.mainView.removeEventListener("ViewShowing", this);
                 };
 
-                this.identityBox = $('identity-icon') || $('identity-box');
+                this.identityBox = $('#identity-icon, #identity-box');
                 if (enableidentityBoxContextMenu && this.identityBox) {
                     // SSL 小锁右键菜单
                     this.identityBox.addEventListener("click", this, false);
@@ -486,27 +486,27 @@ else {
                         this.updateModifiedFile();
                     }
 
-                    event.target.querySelectorAll(`.addMenu`).forEach(m => {
+                    for (const m of $$(`.addMenu`, event.target)) {
                         // 强制去除隐藏属性
                         m.removeAttribute("hidden");
                         // 显示时自动更新标签
                         if (m.hasAttribute('onshowinglabel')) {
                             onshowinglabelMaxLength ||= 15;
-                            var sel = addMenu.convertText(m.getAttribute('onshowinglabel'));
+                            let sel = addMenu.convertText(m.getAttribute('onshowinglabel'));
                             if (sel?.length > 15) sel = sel.substr(0, 15) + "...";
                             m.setAttribute('label', sel);
                         }
-                    });
+                    }
 
                     let insertPoint = "";
 
-                    if (event.target.id == 'contentAreaContextMenu') {
+                    if (gContextMenu && event.target.id == 'contentAreaContextMenu') {
                         var state = [];
                         if (gContextMenu.onTextInput)
                             state.push("input");
                         if (gContextMenu.isContentSelected || gContextMenu.isTextSelected)
                             state.push("select");
-                        if (gContextMenu.onLink || event.target.querySelector("#context-openlinkincurrent").getAttribute("hidden") !== "true")
+                        if (gContextMenu.onLink || event.target.matches("#context-openlinkincurrent:not([hidden=true])"))
                             state.push(gContextMenu.onMailtoLink ? "mailto" : "link");
                         if (gContextMenu.onCanvas)
                             state.push("canvas image");
@@ -520,15 +520,15 @@ else {
                     }
 
                     if (event.target.id === "toolbar-context-menu") {
-                        let triggerNode = event.target.triggerNode;
-                        var state = [];
+                        const triggerNode = event.target.triggerNode;
+                        const state = [];
                         const map = {
                             'toolbar-menubar': 'menubar',
                             'TabsToolbar': 'tabs',
                             'nav-bar': 'navbar',
                             'PersonalToolbar': 'personal',
-                        }
-                        Object.keys(map).map(e => $(e).contains(triggerNode) && state.push(map[e]));
+                        };
+                        Object.keys(map).forEach(i => $(i).contains(triggerNode) && state.push(map[i]));
                         if (triggerNode?.matches("toolbarbutton")) {
                             state.push("button");
                         }
@@ -554,20 +554,21 @@ else {
                         insertPoint = "addMenu-tool-insertpoint";
                     }
 
-                    this.customShowings.forEach(function(obj) {
+                    this.customShowings?.forEach(function(obj) {
                         if (obj.insertPoint !== insertPoint) return;
                         var curItem = obj.item;
                         try {
                             eval('(' + obj.fnSource + ').call(curItem, curItem)');
+                            //obj.fnSource?.call(window, curItem)
                         } catch (ex) {
-                            console.error($L('custom showing method error'), obj.fnSource, ex);
+                            error($L('custom showing method error'), obj.fnSource, ex);
                         }
                     });
 
                     setTimeout(_ => {
-                        event.target.querySelectorAll('menuitem.addMenu[command],menu.addMenu[command]').forEach(elem => {
+                        event.target.querySelectorAll('.addMenu[command]').forEach(elem => {
                             if (elem.parentNode.matches('menugroup')) return;
-                            let original = document.getElementById(elem.getAttribute('command'));
+                            let original = $(elem.getAttribute('command'));
                             if (original) {
                                 elem.hidden = original.hidden;
                                 elem.collapsed = original.collapsed;
@@ -576,13 +577,10 @@ else {
                         });
                         event.target.querySelectorAll('menugroup.addMenu').forEach(group => {
                             [...group.children].forEach(elem => {
-                                if (elem.matches(`menu [command], menuitem[command]`)) {
-                                    elem.removeAttribute('hidden');
-                                    const oringal = document.getElementById(elem.getAttribute('command'));
-                                    if (oringal) {
-                                        elem.disabled = oringal.hidden;
-                                    }
-                                }
+                                if (!elem.matches(`menu [command], menuitem[command]`)) return;
+								elem.removeAttribute('hidden');
+								const oringal = $(elem.getAttribute('command'));
+								if (oringal) elem.disabled = oringal.hidden;
                             });
                         });
                     }, 9);
@@ -591,8 +589,7 @@ else {
                     if (event.target != event.currentTarget) return;
                     if (event.target.id === "contentAreaContextMenu") {
                         Object.assign(this.ContextMenu, {
-                            svg: null,
-                            onSvg: false
+                            svg: null, onSvg: false
                         });
                     }
                     break;
@@ -617,8 +614,7 @@ else {
                     if (tab === void 0) return;
                     const browser = gBrowser.getBrowserForTab(tab);
                     const URI = browser.currentURI || browser.documentURI;
-                    if (!URI) return;
-                    if (!(/^(f|ht)tps?:/.test(URI.spec))) return;
+                    if (!URI || !/^(f|ht)tps?:/.test(URI.spec)) return;
                     try {
                         let hash = calculateHashFromStr(URI.spec);
                         tab.faviconHash = hash;
@@ -640,7 +636,6 @@ else {
                     // Request the has result as ASCII base64
                     return gCryptoHash.finish(true);
                 }
-
             },
             updateModifiedFile() {
                 if (!this.FILE.exists()) return;
@@ -662,13 +657,13 @@ else {
                 var exec = menuitem.getAttribute("exec") || "";
 
                 if (keyword) {
-                    let param = (text ? (text = this.convertText(text)) : "");
+                    let param = text ? (text = this.convertText(text)) : "";
                     let engine = keyword === "@default" ? Services.search.getDefault() : Services.search.getEngineByAlias(keyword);
-                    engine.then(function (engine) {
+                    engine.then((engine) => {
                         let submission = engine.getSubmission(param);
-                        addMenu.openCommand(event, submission.uri.spec, where);
+                        this.openCommand(event, submission.uri.spec, where);
                     }).catch(() => {
-                        PlacesUtils.keywords.fetch(keyword || '').then(entry => {
+                        PlacesUtils.keywords.fetch(keyword).then(entry => {
                             if (!entry) return;
                             let newurl = entry.url.href.replace('%s', encodeURIComponent(param));
                             this.openCommand(event, newurl, where);
@@ -682,7 +677,7 @@ else {
                 else if (text)
                     this.copy(this.convertText(text));
             },
-            openCommand(event, url, aWhere, aAllowThirdPartyFixup, aPostData, aReferrerInfo) {
+            openCommand(event, url, aWhere = 'tab', aAllowThirdPartyFixup, aPostData, aReferrerInfo) {
                 const isJavaScriptURL = url.startsWith("javascript:");
                 const isWebURL = /^(f|ht)tps?:/.test(url);
                 if (aWhere?.includes('tab') && gBrowser.selectedTab.isEmpty) {
@@ -696,15 +691,11 @@ else {
 
                 // 遵循容器设定
                 if (!allowThirdPartyFixup.userContextId && isWebURL) {
-                    allowThirdPartyFixup.userContextId = gBrowser.contentPrincipal.userContextId || gBrowser.selectedBrowser.getAttribute("userContextId") || null;
+                    allowThirdPartyFixup.userContextId = gBrowser.contentPrincipal.userContextId || gBrowser.selectedBrowser.contentPrincipal.userContextId || null;
                 }
 
-                if (aPostData) {
-                    allowThirdPartyFixup.postData = aPostData;
-                }
-                if (aReferrerInfo) {
-                    allowThirdPartyFixup.referrerInfo = aReferrerInfo;
-                }
+                if (aPostData) allowThirdPartyFixup.postData = aPostData;
+                if (aReferrerInfo) allowThirdPartyFixup.referrerInfo = aReferrerInfo;
 
                 // Set triggeringPrincipal based on 'where' and URL scheme
                 allowThirdPartyFixup.triggeringPrincipal = (() => {
@@ -748,20 +739,18 @@ else {
 
                     file.initWithPath(path);
                     if (!file.exists()) {
-                        this.error($L("file not found", path));
+                        error($L("file not found", path));
                         return;
                     }
 
                     // Linux 下目录也是 executable
                     if (!file.isDirectory() && file.isExecutable()) {
                         process.init(file);
-                        process.runw(false, a, a.length);
+                        process.run(false, a, a.length);
                     } else {
                         file.launch();
                     }
-                } catch (e) {
-                    this.log(e);
-                }
+                } catch (e) { log(e) }
             },
             handleRelativePath(path, parentPath) {
                 if (path) {
@@ -799,25 +788,22 @@ else {
                 }
             },
             rebuild(isAlert) {
-                var aFile = this.FILE;
-
-                if (!aFile || !aFile.exists() || !aFile.isFile()) {
-                    this.log(aFile ? aFile.path : U($L('config file')) + U($L('not exists')));
+                const aFile = this.FILE;
+                if (!aFile?.exists() || !aFile.isFile()) {
+                    log(aFile ? aFile.path : U($L('config file')) + U($L('not exists')));
                     return;
                 }
 
                 var data = loadText(aFile.path);
                 var sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
-
+                Object.assign(sandbox, {
+                    Cc, Ci, Cr, Cu, Services, $, $L, loadText,
+                    locale: this.locale,
+                    'addMenu': this,
+                    _css: [],
+                    gBrowser: gBrowser
+                });
                 sandbox.Components = Components;
-                sandbox.Cc = Cc;
-                sandbox.Ci = Ci;
-                sandbox.Cr = Cr;
-                sandbox.Cu = Cu;
-                sandbox.Services = Services;
-                sandbox.locale = this.locale;
-                sandbox.addMenu = this;
-                sandbox.$L = $L;
 
                 var includeSrc = "";
                 sandbox.include = function(aLeafName) {
@@ -826,9 +812,8 @@ else {
                     var data = loadText(file.path);
                     if (data) includeSrc += data + "\n";
                 };
-                sandbox._css = [];
 
-                Object.values(MENU_ATTRS).forEach(function({ current, submenu, groupmenu }) {
+                Object.values(MENU_ATTRS).forEach(({ current, submenu, groupmenu }) => {
                     sandbox["_" + current] = [];
                     if (submenu !== "GroupMenu") {
                         sandbox[current] = function(itemObj) {
@@ -851,30 +836,27 @@ else {
                             ps(itemObj, menuObj._items);
                         }
                     }
-                }, this);
+                });
 
-                function ps(item, array) {
-                    ("join" in item && "unshift" in item) ?
-                        [].push.apply(array, item) : array.push(item);
+                function ps(item, a) {
+                    Array.isArray(item) ? a.push.apply(a, item) : a.push(item);
                 }
 
                 try {
                     var lineFinder = new Error();
-                    Cu.evalInSandbox("function css(code){ this._css.push(code+'') };\n" + data, sandbox, "latest");
+                    Cu.evalInSandbox("function css(code){ this._css.push(code+'') };"+ data, sandbox);
                     Cu.evalInSandbox(includeSrc, sandbox, "latest");
                 } catch (e) {
                     let line = e.lineNumber - lineFinder.lineNumber - 1;
                     this.alert(e + $L("check config file with line", line), null, function() {
                         addMenu.edit(addMenu.FILE, line);
                     });
-                    return this.log(e);
+                    return log(e);
                 }
                 this.style2?.remove();
-                if (sandbox._css.length)
-                    this.style2 = addStyle(sandbox._css.join("\n"));
+                if (sandbox._css.length) this.style2 = addStyle(sandbox._css.join("\n"));
 
                 this.removeMenuitem();
-
                 this.customShowings = [];
                 this.customFrameResult = [];
 
@@ -886,7 +868,7 @@ else {
                 if (isAlert) this.alert(U($L('config has reload')));
             },
             newGroupMenu(menuObj, opt) {
-                var group = $C('menugroup');
+                const group = $C('menugroup');
 
                 // 增加 onshowing 事件
                 if (menuObj.onshowing) {
@@ -897,58 +879,39 @@ else {
                     });
                     delete menuObj.onshowing;
                 }
+                this.procFrameScript(menuObj);
 
-                if (menuObj.framescript) {
-                    if (typeof menuObj.framescript === "function") {
-                        menuObj.framescript = menuObj.framescript.toString();
-                    } else if (menuObj.framescript.keyword && menuObj.framescript.result && menuObj.framescript.script) {
-                        this.customFrameResult.push({
-                            keyword: menuObj.framescript.keyword,
-                            result: menuObj.framescript.result,
-                        })
-                        if (typeof menuObj.framescript.script === "function") {
-                            menuObj.framescript = menuObj.framescript.script.toString();
-                        }
-                    }
-                    menuObj.framescript = btoa(encodeURIComponent(menuObj.framescript));
-                }
-
-                Object.keys(menuObj).map(function(key) {
-                    var val = menuObj[key];
+                Object.keys(menuObj).forEach((key) => {
                     if (key === "_items") return;
                     if (key === "_group") return;
+                    var val = menuObj[key];
                     if (typeof val == "function")
                         menuObj[key] = val = "(" + val.toString() + ").call(this, event);";
                     group.setAttribute(key, val);
-                }, this);
-                let cls = group.classList;
-                cls.add('addMenu');
+                });
+                group.classList.add('addMenu');
 
                 this.setCondition(group, menuObj, opt);
                 // Sync condition attribute to child menus
-                menuObj._items.forEach(function(obj) {
-                    if (!Object.keys(obj).includes("condition")) {
+                menuObj._items.forEach((obj) => {
+                    if (!("condition" in obj)) {
                         obj.condition = group.getAttribute("condition");
                     }
-                });
-
-                menuObj._items.forEach(function(obj) {
                     group.appendChild(this.newMenuitem(obj, {
                         isMenuGroup: true
                     }));
-                }, this);
+                });
                 return group;
             },
             newMenu(menuObj, opt = {}) {
                 if (menuObj._group) {
                     return this.newGroupMenu(menuObj, opt);
                 }
-                var isAppMenu = opt.insertPoint?.localName === "toolbarseparator" && opt.insertPoint.id === 'addMenu-app-insertpoint',
+                const isAppMenu = opt.insertPoint?.matches('toolbarseparator#addMenu-app-insertpoint'),
                     separatorType = isAppMenu ? "toolbarseparator" : "menuseparator",
                     menuitemType = isAppMenu ? "toolbarbutton" : "menu",
-                    menu = $C(menuitemType),
-                    popup,
-                    panelId;
+                    menu = $C(menuitemType);
+                let popup, panelId;
 
                 // fix for appmenu
                 const viewCache = $('appMenu-viewCache')?.content || $('appMenu-multiView');
@@ -975,25 +938,10 @@ else {
                     });
                     delete menuObj.onshowing;
                 }
-
-                if (menuObj.framescript) {
-                    if (typeof menuObj.framescript === "function") {
-                        menuObj.framescript = menuObj.framescript.toString();
-                    } else if (menuObj.framescript.keyword && menuObj.framescript.result && menuObj.framescript.script) {
-                        this.customFrameResult.push({
-                            keyword: menuObj.framescript.keyword,
-                            result: menuObj.framescript.result
-                        });
-                        if (typeof menuObj.framescript.script === "function") {
-                            menuObj.framescript = menuObj.framescript.script.toString();
-                        }
-                    }
-                    menuObj.framescript = btoa(encodeURIComponent(menuObj.framescript));
-                }
-
+                this.procFrameScript(menuObj);
                 for (let key in menuObj) {
-                    let val = menuObj[key];
                     if (key === "_items") continue;
+                    let val = menuObj[key];
                     if (typeof val == "function")
                         menuObj[key] = val = "(" + val.toString() + ").call(this, event);"
                     menu.setAttribute(key, val);
@@ -1010,9 +958,9 @@ else {
 
                 this.setCondition(menu, menuObj, opt);
 
-                menuObj._items.forEach(function(obj) {
-                    popup.appendChild(this.newMenuitem(obj, opt));
-                }, this);
+                menuObj._items?.forEach(obj => {
+                    popup.appendChild(this.newMenuitem(obj, opt))
+                });
 
                 // menu に label が無い場合、最初の menuitem の label 等を持ってくる
                 // menu 部分をクリックで実行できるようにする(splitmenu みたいな感じ)
@@ -1022,11 +970,11 @@ else {
                     let firstItem = menu.querySelector('menuitem');
                     if (firstItem) {
                         let command = firstItem.getAttribute('command');
-                        if (firstItem.classList.contains('copy')) {
+                        if (firstItem.matches('.copy')) {
                             menu.classList.add('copy');
                         }
-                        if (command) firstItem = document.getElementById(command) || firstItem;
-                        ['label', 'data-l10n-href', 'data-l10n-id', 'accesskey', 'icon', 'tooltiptext'].forEach(function (n) {
+                        if (command) firstItem = $(command) || firstItem;
+                        ['label', 'data-l10n-href', 'data-l10n-id', 'accesskey', 'icon', 'tooltiptext'].forEach(function(n) {
                             if (!menu.hasAttribute(n) && firstItem.hasAttribute(n))
                                 menu.setAttribute(n, firstItem.getAttribute(n));
                         }, this);
@@ -1047,18 +995,31 @@ else {
 
                 return menu;
             },
+            procFrameScript(menuObj) {
+                let r = menuObj.framescript;
+                if (!r) return;
+                if (typeof r == "function") r = r.toString();
+                else if (r instanceof Object) {
+                    const { keyword, result, script } = r;
+                    if (keyword && result && script) {
+                        this.customFrameResult.push({ keyword, result });
+                    }
+                    if (script) r = script.toString();
+                }
+                menuObj.framescript = btoa(encodeURIComponent(r));
+            },
             newMenuitem(obj, opt = {}) {
-                var menuitem,
-                    isAppMenu = opt.insertPoint?.localName === "toolbarseparator" && opt.insertPoint.id === 'addMenu-app-insertpoint',
+                const isAppMenu = opt.insertPoint?.matches('toolbarseparator#addMenu-app-insertpoint'),
                     separatorType = isAppMenu ? "toolbarseparator" : "menuseparator",
-                    menuitemType = isAppMenu ? "toolbarbutton" : "menuitem",
-                    noDefaultLabel = false;
+                    menuitemType = isAppMenu ? "toolbarbutton" : "menuitem";
+                let menuitem, noDefaultLabel = false;
 
                 if (obj.label === "separator" ||
                     (!obj.label && !obj.image && !obj.text && !obj.keyword && !obj.url && !obj.oncommand && !obj.command && !obj['data-l10n-id'])) {
                     menuitem = $C(separatorType);
-                } else if (obj.oncommand || obj.command) {
-                    let org = obj.command ? document.getElementById(obj.command) : null;
+                }
+                else if (obj.oncommand || obj.command) {
+                    let org = obj.command ? $(obj.command) : null;
                     if (org?.localName === separatorType) {
                         menuitem = $C(separatorType);
                     } else {
@@ -1068,13 +1029,12 @@ else {
 
                         noDefaultLabel = !obj.label;
                         if (noDefaultLabel)
-                            obj.label = (org ? org.getAttribute("label") : obj.command || obj.oncommand);
+                            obj.label = org ? org.getAttribute("label") : obj.command || obj.oncommand;
 
-                        if (obj.class) {
-                            obj.class.split(" ").forEach(c => menuitem.classList.add(c));
-                        }
+                        obj.class?.split(" ").forEach(c => menuitem.classList.add(c));
                     }
-                } else {
+                }
+                else {
                     menuitem = $C(menuitemType);
 
                     // property fix
@@ -1092,17 +1052,16 @@ else {
 
                     if (obj.where && /\b(tab|tabshifted|window|current)\b/i.test(obj.where))
                         obj.where = RegExp.$1.toLowerCase();
-
                     if (obj.where && !("acceltext" in obj))
                         obj.acceltext = obj.where;
 
                     if (!obj.condition && (obj.url || obj.text)) {
-                        let condition = "";
-                        if (this.rSEL.test(obj.url || obj.text)) condition += " select";
-                        if (this.rLINK.test(obj.url || obj.text)) condition += " link";
-                        if (this.rEMAIL.test(obj.url || obj.text)) condition += " mailto";
-                        if (this.rIMAGE.test(obj.url || obj.text)) condition += " image";
-                        if (this.rMEDIA.test(obj.url || obj.text)) condition += " media";
+                        let condition = "", s = obj.url || obj.text;
+                        if (this.rSEL.test(s)) condition += " select";
+                        if (this.rLINK.test(s)) condition += " link";
+                        if (this.rEMAIL.test(s)) condition += " mailto";
+                        if (this.rIMAGE.test(s)) condition += " image";
+                        if (this.rMEDIA.test(s)) condition += " media";
                         if (condition) obj.condition = condition;
                     }
 
@@ -1121,21 +1080,7 @@ else {
                     delete obj.onshowing;
                 }
 
-                if (obj.framescript) {
-                    if (typeof obj.framescript === "function") {
-                        obj.framescript = obj.framescript.toString();
-                    } else if (obj.framescript.keyword && obj.framescript.result && obj.framescript.script) {
-                        this.customFrameResult.push({
-                            keyword: obj.framescript.keyword,
-                            result: obj.framescript.result,
-                        })
-                        if (typeof obj.framescript.script === "function") {
-                            obj.framescript = obj.framescript.script.toString();
-                        }
-                    }
-                    obj.framescript = btoa(encodeURIComponent(obj.framescript));
-                }
-
+                this.procFrameScript(obj);
                 for (let key in obj) {
                     let val = obj[key];
                     if (key === "command") continue;
@@ -1147,13 +1092,17 @@ else {
                 if (noDefaultLabel && menuitem.localName !== separatorType) {
                     if (this.supportLocalization && obj["data-l10n-href"]?.endsWith(".ftl") && obj['data-l10n-id']) {
                         // Localization 支持
-                        let strings = new Localization([obj["data-l10n-href"]], true); // 第二个参数为 true 则是同步返回
-                        menuitem.setAttribute('label', strings.formatValueSync([obj['data-l10n-id']]) || menuitem.getAttribute("label"));
-                    } else if (obj.keyword) {
+                        const label = new Localization([obj["data-l10n-href"]], true) // 第二个参数为 true 则是同步返回
+                            .formatValueSync([obj['data-l10n-id']]);
+                        label && menuitem.setAttribute('label', label);
+                    }
+                    else if (obj.keyword) {
                         // 调用搜索引擎 Label hack
-                        let engine = obj.keyword === "@default" ? Services.search.getDefault() : Services.search.getEngineByAlias(obj.keyword);
+                        const engine = obj.keyword === "@default"
+                            ? Services.search.getDefault()
+                            : Services.search.getEngineByAlias(obj.keyword);
                         engine.then(s => {
-                            if (s && s._name) menuitem.setAttribute('label', s._name);
+                            if (s?._name) menuitem.setAttribute('label', s._name);
                         });
                     }
                 }
@@ -1167,8 +1116,6 @@ else {
                 }
 
                 this.setCondition(menuitem, obj, opt);
-
-                // separator はここで終了
                 if (menuitem.localName == "menuseparator") return menuitem;
 
                 if (!obj.onclick)
@@ -1185,12 +1132,10 @@ else {
                 }
 
                 this.setIcon(menuitem, obj);
-
                 return menuitem;
             },
             createMenuitem(itemArray, insertPoint) {
-                var chldren = [...insertPoint.parentNode.children];
-                //Symbol.iterator
+                const chldren = [...insertPoint.parentNode.children];
                 for (let obj of itemArray) {
                     if (!obj) continue;
                     let menuitem;
@@ -1198,46 +1143,30 @@ else {
                     // clone menuitem and set attribute
                     if (obj.id && (menuitem = $(obj.id))) {
                         let dupMenuitem;
-                        let isDupMenu = (obj.clone != false);
+                        const isDupMenu = obj.clone != false;
                         if (isDupMenu) {
                             dupMenuitem = menuitem.cloneNode(true);
-
                             // 隐藏原菜单
                             // menuitem.classList.add("addMenuHide");
                         } else {
                             dupMenuitem = menuitem;
                             // 增加用于还原已移动菜单的标记
-							dupMenuitem?.before($C(insertPoint.localName, {
-								'original-id': dupMenuitem.getAttribute('id'),
+							dupMenuitem.before($C(insertPoint.localName, {
+								'original-id': dupMenuitem.id,
 								hidden: true,
-								class: 'addMenuOriginal',
+								class: 'addMenuOriginal'
 							}));
                         }
-                        if (obj.framescript) {
-                            if (typeof obj.framescript === "function") {
-                                obj.framescript = obj.framescript.toString();
-                            } else if (obj.framescript.keyword && obj.framescript.result && obj.framescript.script) {
-                                this.customFrameResult.push({
-                                    keyword: obj.framescript.keyword,
-                                    result: obj.framescript.result
-                                });
-                                if (typeof obj.framescript.script === "function") {
-                                    obj.framescript = obj.framescript.script.toString();
-                                }
-                            }
-                            obj.framescript = btoa(encodeURIComponent(obj.framescript));
-                        }
+                        this.procFrameScript(obj);
                         for (let key in obj) {
                             let val = obj[key];
                             if (typeof val == "function")
                                 obj[key] = val = "(" + val.toString() + ").call(this, event);";
-
                             dupMenuitem.setAttribute(key, val);
                         }
 
                         // 如果没有则添加 menuitem-iconic 或 menu-iconic，给菜单添加图标用。
-                        let type = dupMenuitem.nodeName,
-                            cls = dupMenuitem.classList;
+                        const { nodeName: type, classList: cls } = dupMenuitem;
                         if (/^menu(item)?$/i.test(type) && !cls.contains(type + '-iconic'))
                             cls.add(type + '-iconic');
                         if (!cls.contains('addMenu'))
@@ -1245,38 +1174,30 @@ else {
                         if (!isDupMenu && !cls.contains('addMenuNot'))
                             cls.add('addMenuNot');
 
-                        // // 没有插入位置的默认放在原来那个菜单的后面
-                        // if(isDupMenu && !obj.insertAfter && !obj.insertBefore && !obj.position){
-                        //     obj.insertAfter = obj.id;
-                        // }
                         insertMenuItem(obj, dupMenuitem, !isDupMenu);
                         continue;
                     }
 
-                    const cfg = {insertPoint: insertPoint};
+                    const cfg = { insertPoint };
 					if (obj._items) cfg.isTopMenuitem = true;
-					menuitem = this.newMenu(obj, cfg);
-                    insertMenuItem(obj, menuitem);
+                    insertMenuItem(obj, this.newMenu(obj, cfg));
                 }
 
                 function insertMenuItem(obj, menuitem, noMove) {
-                    let ins;
-                    if (obj.parent && (ins = $(obj.parent))) {
-                        ins.appendChild(menuitem);
+                    if (obj.parent) {
+                        $(obj.parent)?.appendChild(menuitem);
                         return;
                     }
-                    if (obj.insertAfter && (ins = $(obj.insertAfter))) {
-                        ins.after(menuitem);
+                    if (obj.insertAfter) {
+                        $(obj.insertAfter)?.after(menuitem);
                         return;
                     }
-                    if (obj.insertBefore && (ins = $(obj.insertBefore))) {
-                        ins.before(menuitem);
+                    if (obj.insertBefore) {
+                        $(obj.insertBefore)?.before(menuitem);
                         return;
                     }
-                    if (obj.position && parseInt(obj.position) > 0) {
-                        (ins = chldren[parseInt(obj.position) - 1]) ?
-                            ins.before(menuitem) :
-                            insertPoint.parentNode.appendChild(menuitem);
+                    if (obj.position > 0) {
+                        (chldren[obj.position-1] || insertPoint).before(menuitem);
                         return;
                     }
                     if (!noMove) {
@@ -1285,9 +1206,8 @@ else {
                 }
             },
             removeMenuitem() {
-                var remove = function (e) {
-                    if (e.classList.contains('addMenuNot')) return;
-                    e.remove();
+                const remove = function(e) {
+                    !e.matches('.addMenuNot') && e.remove();
                 };
 
                 $$('.addMenuOriginal').forEach((e) => {
@@ -1323,7 +1243,7 @@ else {
                     if (!aFile.exists()) {
                         menu.setAttribute("disabled", "true");
                     } else if (aFile.isFile()) {
-                        setImage(menu, "moz-icon://" + this.getURLSpecFromFile(aFile) + "?size=16");
+                        setImage(menu, "moz-icon://" + getURLSpecFromFile(aFile) + "?size=16");
                     } else {
                         setImage(menu, "chrome://global/skin/icons/folder.svg");
                     }
@@ -1341,53 +1261,37 @@ else {
                         return (engine._iconURI || engine.iconURI)?.spec || "chrome://browser/skin/search-engine-placeholder.png";
                     }
                 }
-                var setIconCallback = function(url) {
+                const setIconCallback = function(url) {
                     let uri;
                     try {
                         uri = Services.io.newURI(url, null, null);
                     } catch (e) {
-                        this.error(e)
+                        return log(e)
                     }
-                    if (!uri) return;
 
                     menu.setAttribute("scheme", uri.scheme);
                     PlacesUtils.favicons.getFaviconDataForPage(uri, {
                         onComplete(aURI, aDataLen, aData, aMimeType) {
                             try {
-                                // javascript: URI の host にアクセスするとエラー
-                                let iconURL = aURI?.spec ?
-                                    "page-icon:" + aURI.spec :
-                                    "page-icon:" + uri.spec;
+                                let iconURL = "page-icon:" + (aURI?.spec || uri.spec);
                                 setImage(menu, iconURL);
                             } catch (e) { }
                         }
                     });
-                }
+                };
 
                 PlacesUtils.keywords.fetch(obj.keyword || '').then(entry => {
-                    let url;
-                    if (entry) {
-                        url = entry.url.href;
-                    } else {
-                        url = (obj.url + '').replace(this.regexp, "");
-                    }
+                    const url = entry ? entry.url.href :
+                        (obj.url + '').replace(this.regexp, "");
                     setIconCallback(url);
-                }, e => {
-                    this.log(e)
-                }).catch(e => { });
+                }, log).catch(error);
             },
-            setCondition(menu, obj, opt = {}) {
-                if (obj.condition) {
-                    let beforeProcessConditons = obj.condition.split(' ');
-                    let conditions = [];
-                    for (let i = 0; i < beforeProcessConditons.length; i++) {
-                        let c = beforeProcessConditons[i] || "";
-                        if (c === "normal") {
-                            conditions.push("normal");
-                        } else if (["select", "link", "mailto", "image", "canvas", "media", "input"].includes(c.replace(/^no/, ""))) {
-                            conditions.push(c);
-                        }
-                    }
+            setCondition(menu, { condition }, opt = {}) {
+                if (condition) {
+                    const tagList = ["select", "link", "mailto", "image", "canvas", "media", "input"];
+                    const conditions = condition.split(' ').filter(c =>
+                        c === "normal" || tagList.includes(c.replace(/^no/, ""))
+                    );
                     if (conditions.length) {
                         menu.setAttribute("condition", conditions.join(" "));
                     }
@@ -1589,22 +1493,20 @@ else {
             getSelectedText() {
                 return this._selectedText;
             },
-            getURLSpecFromFile: getURLSpecFromFile,
-            edit(aFile, aLineNumber) {
-                if (!aFile || !aFile.exists() || !aFile.isFile()) return;
+            edit(aFile, lineNumber) {
+                if (!aFile?.exists() || !aFile.isFile()) return;
 
-                var editor;
+                let editor;
                 try {
-                    editor = Services.prefs
-						.getComplexValue("view_source.editor.path", Ci.nsIFile);
+                    editor = Services.prefs.getComplexValue("view_source.editor.path", Ci.nsIFile);
                 } catch (e) { }
 
-                if (!editor || !editor.exists()) {
+                if (!editor?.exists()) {
                     alert($L('please set editor path'));
                     var fp = Cc['@mozilla.org/filepicker;1'].createInstance(Ci.nsIFilePicker);
                     // Bug 1878401 Always pass BrowsingContext to nsIFilePicker::Init
-                    fp.init(!("inIsolatedMozBrowser" in window.browsingContext.originAttributes)
-                        ? window.browsingContext : window,
+                    fp.init("inIsolatedMozBrowser" in window.browsingContext.originAttributes
+                        ? window : window.browsingContext,
 						$L('set global editor'), fp.modeOpen);
                     fp.appendFilters(Ci.nsIFilePicker.filterApps);
 
@@ -1619,14 +1521,12 @@ else {
                     }
                 }
 
-                var aURL = this.getURLSpecFromFile(aFile);
                 var aDocument = null;
                 var aCallBack = null;
                 var aPageDescriptor = null;
-                gViewSourceUtils.openInExternalEditor({
-                    URL: aURL,
-                    lineNumber: aLineNumber
-                }, aPageDescriptor, aDocument, aLineNumber, aCallBack);
+                gViewSourceUtils.openInExternalEditor(
+                    { lineNumber, URL: getURLSpecFromFile(aFile) },
+                    aPageDescriptor, aDocument, lineNumber, aCallBack);
             },
             copy(aText) {
                 Cc["@mozilla.org/widget/clipboardhelper;1"]
@@ -1634,48 +1534,38 @@ else {
             },
             copyLink(copyURL, copyLabel) {
                 // generate the Unicode and HTML versions of the Link
-                var textUnicode = copyURL;
-                var textHtml = `<a href="${copyURL}">${copyLabel}</a>`;
-
+                const textUnicode = copyURL;
+                const textHtml = `<a href="${copyURL}">${copyLabel}</a>`;
+                // add Unicode & HTML flavors to the transferable widget
+                const trans = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
+                if (!trans) return false; //no transferable widget found
+                const clipboard = Cc["@mozilla.org/widget/clipboard;1"].getService(Ci.nsIClipboard);
+                if (!clipboard) return false; // couldn't get the clipboard
                 // make a copy of the Unicode
-                var str = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
+                const str = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
                 if (!str) return false; // couldn't get string obj
                 str.data = textUnicode; // unicode string?
-
                 // make a copy of the HTML
-                var htmlstring = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
-                if (!htmlstring) return false; // couldn't get string obj
+                const htmlstring = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
                 htmlstring.data = textHtml;
-
-                // add Unicode & HTML flavors to the transferable widget
-                var trans = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
-                if (!trans) return false; //no transferable widget found
 
                 trans.addDataFlavor("text/unicode");
                 trans.setTransferData("text/unicode", str, textUnicode.length * 2); // *2 because it's unicode
-
                 trans.addDataFlavor("text/html");
-                trans.setTransferData("text/html", htmlstring, textHtml.length * 2); // *2 because it's unicode
-
-                // copy the transferable widget!
-                var clipboard = Cc["@mozilla.org/widget/clipboard;1"].getService(Ci.nsIClipboard);
-                if (!clipboard) return false; // couldn't get the clipboard
+                trans.setTransferData("text/html", htmlstring, textHtml.length * 2);
 
                 clipboard.setData(trans, null, Ci.nsIClipboard.kGlobalClipboard);
                 return true;
             },
             copyImage(base64URI, imageMime) {
                 // https://searchfox.org/mozilla-central/rev/d5ed9df049e40f12d058a5b7c2f3451ed778163b/devtools/client/shared/screenshot.js#293-325
-                if (!(/^data:(?:image\/(jpeg|png|gif|bmp|webp|svg|ico|x-jxl|x-jxlp))|(x-icon);base64,/i.test(base64URI))) return;
+                if (!(/^data:image\/(jpeg|png|gif|bmp|webp|svg|ico|x-jxl|x-jxlp|x-icon);base64,/i.test(base64URI))) return;
                 if (!isFirefoxSupportedImageMime(imageMime)) return;
                 try {
                     const imageTools = Cc["@mozilla.org/image/tools;1"].getService(Ci.imgITools);
-                    const base64Data = base64URI.split(";base64,")[1];
-                    const image = atob(base64Data);
-                    const img = imageTools.decodeImageFromBuffer(image, image.length, imageMime);
-                    const transferable = Cc[
-                        "@mozilla.org/widget/transferable;1"
-                    ].createInstance(Ci.nsITransferable);
+                    const data = atob(base64URI.split(";base64,")[1]);
+                    const img = imageTools.decodeImageFromBuffer(data, data.length, imageMime);
+                    const transferable = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
                     transferable.init(null);
                     transferable.addDataFlavor(imageMime);
                     transferable.setTransferData(imageMime, img);
@@ -1685,7 +1575,7 @@ else {
                         Services.clipboard.kGlobalClipboard
                     );
                 } catch (e) {
-                    this.error(e);
+                    error(e);
                 }
             },
             alert(aMsg, aTitle, aCallback) {
@@ -1698,20 +1588,16 @@ else {
                 alertsService.showAlertNotification("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSJjb250ZXh0LWZpbGwiIGZpbGwtb3BhY2l0eT0iY29udGV4dC1maWxsLW9wYWNpdHkiPjxwYXRoIGZpbGw9Im5vbmUiIGQ9Ik0wIDBoMjR2MjRIMHoiLz48cGF0aCBkPSJNMTIgMjJDNi40NzcgMjIgMiAxNy41MjMgMiAxMlM2LjQ3NyAyIDEyIDJzMTAgNC40NzcgMTAgMTAtNC40NzcgMTAtMTAgMTB6bTAtMmE4IDggMCAxIDAgMC0xNiA4IDggMCAwIDAgMCAxNnpNMTEgN2gydjJoLTJWN3ptMCA0aDJ2NmgtMnYtNnoiLz48L3N2Zz4=", aTitle || "addMenuPlus",
                     aMsg + "", !!callback, "", callback);
             },
-            log: log,
-            error: error
         };
 
-        function $(id) {
-            return document.getElementById(id);
+        function $(id, doc=document) {
+            if (!id) return;
+            if (/[, \.\[\(\>]/.test(id)) return doc.querySelector(id);
+            return doc.getElementById(id.startsWith("#") ? id.substring(1) : id);
         }
 
         function $$(exp, doc = document) {
-            return Array.prototype.slice.call(doc.querySelectorAll(exp);
-        }
-
-        function $A(args) {
-            return Array.prototype.slice.call(args);
+            return Array.prototype.slice.call(doc.querySelectorAll(exp));
         }
 
         function log(...args) {
@@ -1726,9 +1612,9 @@ else {
             return 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text
         };
 
-        function $C(name, attr = {}) {
-            var el = document.createXULElement(name);
-            if (attr) Object.keys(attr).forEach(function (n) {
+        function $C(name, attr) {
+            const el = document.createXULElement(name);
+            if (attr) Object.keys(attr).forEach(function(n) {
                 el.setAttribute(n, attr[n])
             });
             return el;
@@ -1760,20 +1646,16 @@ else {
             foStream.write(data, data.length);
             foStream.close();
         }
-
+        // 首字母大写
         function capitalize(s) {
             return s && s[0].toUpperCase() + s.slice(1);
         }
 
-        function $L(...a) {
-            let key = [0];
+        function $L(key, ...repl) {
             if (!key) return "";
             if (!ADDMENU_LANG[ADDMENU_LOCALE].hasOwnProperty(key)) return capitalize(key);
-            let str = ADDMENU_LANG[ADDMENU_LOCALE][key];
-            for (let i = 1; i < a.length; i++) {
-                str = str.replace("%s", a[i]);
-            }
-            return str;
+            let i = 0;
+            return ADDMENU_LANG[ADDMENU_LOCALE][key].replaceAll('%s', x => repl[i++]);
         }
 
         function isDef(v) {
@@ -1928,7 +1810,7 @@ else {
                 console.error(e);
             }).finally(() => {
                 isCompleted = true;
-            })
+            });
             var thread = Cc['@mozilla.org/thread-manager;1'].getService().mainThread;
             while (!isCompleted) {
                 thread.processNextEvent(true);
@@ -1972,5 +1854,6 @@ else {
             'image/jxl', // JPEG XL
         ];
         return firefoxSupportedImageMimes.includes(mime.toLowerCase());
-    })
+    }
+)
 }

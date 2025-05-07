@@ -32,13 +32,13 @@
             } catch (e) {
                 path = '_keychanger.js';
             }
-            aFile = Services.dirsvc.get("UChrm", Ci.nsIFile);
+            const aFile = Services.dirsvc.get("UChrm", Ci.nsIFile);
             aFile.appendRelativePath(path);
             if (!aFile.exists()) {
                 saveFile(aFile, '');
                 alert('_keychanger.js 配置为空');
             }
-            return this.FILE = aFile;
+            return this.FILE = aFile; // 缓存起来，只须执行一次本函数
         },
         get prefs() {
             delete this.prefs;
@@ -48,7 +48,7 @@
         _selectedText: "",
         KEYSETID: "keychanger-keyset",
         addEventListener() {
-            (gBrowser.mPanelContainer || gBrowser.tabpanels).addEventListener("mouseup", this, false);
+            gBrowser.tabpanels.addEventListener("mouseup", this, false);
         },
         handleEvent(event) {
             switch (event.type) {
@@ -57,9 +57,9 @@
                     this.setSelectedText(content.getSelection().toString());
                 } else {
                     try {
-                        gBrowser.selectedBrowser.finder.getInitialSelection().then((r) => {
-                            this.setSelectedText(r.selectedText);
-                        })
+                        gBrowser.selectedBrowser.finder.getInitialSelection().then(r => {
+                            r && this.setSelectedText(r.selectedText);
+                        });
                     } catch (e) { }
                 }
                 break;
@@ -80,12 +80,12 @@
                 return this.alert('KeyChanger', 'Load error.');
             }
             $(this.KEYSETID)?.remove();
-            let keyset = $C("keyset", {id: this.KEYSETID});
+            const keyset = $C("keyset", {id: this.KEYSETID});
 			keyset.appendChild(keys);
 
             const df = document.createDocumentFragment();
             for (const e of $$('keyset')) df.appendChild(e);
-            $('mainPopupSet').before(keyset,df);
+            $('mainPopupSet').before(keyset, df);
             const e = Date.now() - s;
             if (isAlert) {
                 this.alert('KeyChanger: Loaded', e + 'ms');
@@ -95,19 +95,23 @@
             }, 100);
         },
         makeKeys() {
-            var str = loadText(this.FILE);
+            const str = loadText(this.FILE);
             if (!str) return null;
 
-            var sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
-            var keys = Cu.evalInSandbox(`var keys={};${str};keys;`, sandbox);
+            const sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
+            Object.assign(sandbox, {
+                Cc, Ci, Cr, Cu, Services,
+                'KeyChanger': this
+            });
+            const keys = Cu.evalInSandbox(`var keys={};${str};keys;`, sandbox);
             if (!keys) return null;
-            var dFrag = document.createDocumentFragment();
+            const dFrag = document.createDocumentFragment();
 
             Object.keys(keys).forEach((n) => {
-                let keyString = n.toUpperCase().split("+");
+                const keyString = n.toUpperCase().split("+");
                 let modifiers = "", key, keycode;
 
-                for (let k of keyString) switch (k) {
+                for (const k of keyString) switch (k) {
 				case "CTRL":
 				case "CONTROL":
 				case "ACCEL":
@@ -177,7 +181,7 @@
 						keycode = k.startsWith("VK_") ? k : "VK_" + k;
 					}
                 }
-                let elem = document.createXULElement('key');
+                const elem = document.createXULElement('key');
                 if (modifiers !== '')
                     elem.setAttribute('modifiers', modifiers.slice(0, -1));
                 if (key)
@@ -185,25 +189,21 @@
                 else if (keycode)
                     elem.setAttribute('keycode', keycode);
 
-                let cmd = keys[n];
+                const cmd = keys[n];
                 switch (typeof cmd) {
+                case 'function':
+                    elem.setAttribute('oncommand', '(' + cmd.toString() + ').call(this, event);');
+                    break;
 				case 'object':
 					Object.keys(cmd).forEach((a) => {
 						if (a === 'oncommand' && cmd[a] === "internal") {
-							elem.addEventListener('command', (event) => {
-								this.internalCommand(event);
-							});
-							delete cmd[a];
-						} else {
-							elem.setAttribute(a, cmd[a]);
+                            cmd[a] = "KeyChanger.internalCommand(event);";
 						}
+						elem.setAttribute(a, cmd[a]);
 					});
 					break;
 				default:
-					elem.dataset.oncommand = typeof cmd === "function" ? cmd.toString() : cmd;
-					elem.addEventListener('command', (event) => {
-						eval('(' + event.target.dataset.oncommand + ')(window, event)');
-					});
+                    elem.setAttribute('oncommand', cmd);
                 }
                 dFrag.appendChild(elem);
             });
@@ -243,54 +243,11 @@
             }
             return cmd;
         },
-        openCommand(url, where, aAllowThirdPartyFixup, aPostData, aReferrerInfo) {
-            where ||= 'tab';
-            const isJavaScriptURL = url.startsWith("javascript:");
-            const isWebURL = /^(f|ht)tps?:/.test(url);
-            // Assign values to allowThirdPartyFixup if provided, or initialize with an empty object
-            const allowThirdPartyFixup = { ...aAllowThirdPartyFixup };
-
-            if (!allowThirdPartyFixup.userContextId && isWebURL) {
-                allowThirdPartyFixup.userContextId = gBrowser.contentPrincipal.userContextId || gBrowser.selectedBrowser.getAttribute("userContextId") || null;
-            }
-            if (aPostData) {
-                allowThirdPartyFixup.postData = aPostData;
-            }
-            if (aReferrerInfo) {
-                allowThirdPartyFixup.referrerInfo = aReferrerInfo;
-            }
-
-            // Set triggeringPrincipal based on 'where' and URL scheme
-            allowThirdPartyFixup.triggeringPrincipal = (() => {
-                if (where === 'current' && !isJavaScriptURL) {
-                    return gBrowser.selectedBrowser.contentPrincipal;
-                }
-
-                return !isWebURL ? Services.scriptSecurityManager.getSystemPrincipal() :
-                    Services.scriptSecurityManager.createNullPrincipal({userContextId:allowThirdPartyFixup.userContextId});
-            })();
-
-            if (isJavaScriptURL) {
-                _openTrustedLinkIn(url, 'current', {
-                    allowPopups: true,
-                    inBackground: allowThirdPartyFixup.inBackground || false,
-                    allowInheritPrincipal: true,
-                    private: PrivateBrowsingUtils.isWindowPrivate(window),
-                    userContextId: allowThirdPartyFixup.userContextId,
-                });
-            } else if (where) {
-                _openTrustedLinkIn(url, where, allowThirdPartyFixup);
-            } else {
-                openUILink(url, {}, {
-                    triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
-                });
-            }
-        },
-        edit(aFile, aLineNumber) {
+        edit(aFile, lineNumber) {
             if (this.isBuilding) return;
-            if (!aFile || !aFile.exists() || !aFile.isFile()) return;
+            if (!aFile?.exists() || !aFile.isFile()) return;
 
-            var editor;
+            let editor;
             try {
                 editor = Services.prefs.getComplexValue("view_source.editor.path", Ci.nsIFile);
             } catch (e) { }
@@ -301,11 +258,11 @@
                     return;
                 }
 				function setPath() {
-					var fp = Cc['@mozilla.org/filepicker;1'].createInstance(Ci.nsIFilePicker);
+					const fp = Cc['@mozilla.org/filepicker;1'].createInstance(Ci.nsIFilePicker);
 					// Bug 1878401 Always pass BrowsingContext to nsIFilePicker::Init
-					fp.init(!("inIsolatedMozBrowser" in window.browsingContext.originAttributes)
-						? window.browsingContext
-						: window, "设置全局脚本编辑器", fp.modeOpen);
+					fp.init("inIsolatedMozBrowser" in window.browsingContext.originAttributes
+						? window : window.browsingContext,
+						 "设置全局脚本编辑器", fp.modeOpen);
 					fp.appendFilter("执行文件", "*.exe");
 
 					if (fp.show !== void 0) {
@@ -321,17 +278,16 @@
 					}
 				}
 				this.alert("请先设置编辑器的路径!!!", "提示", setPath);
+                //toOpenWindowByType('pref:pref', 'about:config');
             }
 
-            var aURL = getURLSpecFromFile(aFile);
             var aDocument = null;
             var aCallBack = null;
             var aPageDescriptor = null;
             gViewSourceUtils.openInExternalEditor({
-                URL: aURL,
-                lineNumber: aLineNumber
-            }, aPageDescriptor, aDocument, aLineNumber, aCallBack);
-
+                URL: getURLSpecFromFile(aFile),
+                lineNumber
+            }, aPageDescriptor, aDocument, lineNumber, aCallBack);
         },
         openScriptInScratchpad(parentWindow, file) {
             let spWin = window.openDialog("chrome://devtools/content/scratchpad/index.xul", "Toolkit:Scratchpad", "chrome,dialog,centerscreen,dependent");
@@ -365,15 +321,45 @@
         alert(aMsg, aTitle, aCallback) {
             var callback = aCallback ? {
                 observe(subject, topic, data) {
-                    if ("alertclickcallback" != topic)
-                        return;
-                    aCallback.call(null);
+                    if ("alertclickcallback" == topic) aCallback.call(null);
                 }
             } : null;
-            var alertsService = Cc["@mozilla.org/alerts-service;1"].getService(Ci.nsIAlertsService);
-            alertsService.showAlertNotification(
-                "chrome://global/skin/icons/information-32.png", aTitle || "keychanger.uc",
-                aMsg + "", !!callback, "", callback);
+            Cc["@mozilla.org/alerts-service;1"]
+                .getService(Ci.nsIAlertsService)
+                .showAlertNotification("chrome://global/skin/icons/information-32.png",
+                aTitle || "keychanger.uc", aMsg +"", !!callback, "", callback);
+        },
+        openCommand(url, where = 'tab', postData = null) {
+            var uri;
+            try {
+                uri = Services.io.newURI(url);
+            } catch (e) {
+                return this.log("URL 有问题: %s".replace("%s", url));
+            }
+            if (uri.scheme === "javascript") this.loadURI(uri);
+            else this.openUILinkIn(uri.spec, where, gBrowser.contentPrincipal.originAttributes?.userContextId ? {
+                userContextId: gBrowser.contentPrincipal.originAttributes.userContextId
+            } : {});
+        },
+        loadURI(url) {
+            try {
+                gBrowser.loadURI(url instanceof Ci.nsIURI ? url : Services.io.newURI(url), {
+                    triggeringPrincipal: gBrowser.contentPrincipal });
+            } catch (ex) {
+                console.error(ex);
+            }
+        },
+        openUILinkIn(url, where, aAllowThirdPartyFixup, aPostData = null, aReferrerInfo = null) {
+            const r = { ...aAllowThirdPartyFixup };
+            r.triggeringPrincipal ||= where === 'current' ? gBrowser.selectedBrowser.contentPrincipal : (
+                /^(f|ht)tps?:/.test(url) ?
+                Services.scriptSecurityManager.createNullPrincipal({}) :
+                Services.scriptSecurityManager.getSystemPrincipal()
+            );
+            r.postData = aPostData;
+            r.referrerInfo = aReferrerInfo;
+
+            _openTrustedLinkIn(url, where, r);
         },
         log(...a) {
             Services.console.logStringMessage("[KeyChanger] " + a);
@@ -390,11 +376,10 @@
 
     function saveFile(fileOrName, data) {
         var file;
-        if (typeof fileOrName == "string") {
+        if (typeof fileOrName != "string") file = fileOrName;
+        else {
             file = Services.dirsvc.get('UChrm', Ci.nsIFile);
             file.appendRelativePath(fileOrName);
-        } else {
-            file = fileOrName;
         }
 
         var suConverter = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
@@ -430,12 +415,8 @@
     function $A(el, attrs, skipAttrs=[]) {
         if (attrs) Object.keys(attrs).forEach(function(key) {
             if (skipAttrs.includes(key)) return;
-            if (key.startsWith('on')) {
-                let fn = attrs[key];
-                if (typeof fn !== 'function') {
-                    fn = (new Function(fn)).bind(window);
-                }
-                el.addEventListener(key.slice(2).toLocaleLowerCase(), fn, false);
+            if (typeof attrs[key] === 'function') {
+                el.setAttribute(key, "(" + attrs[key].toString() + ").call(this, event);");
             } else {
                 el.setAttribute(key, attrs[key]);
             }
@@ -453,6 +434,17 @@
         },
         other() {
             gBrowser.removeAllTabsBut(gBrowser.selectedTab);
+        },
+        toEnd() {
+            gBrowser.removeTabsToTheEndFrom(gBrowser.selectedTab);
+        }
+    },
+    reload: {
+        current() {
+            gBrowser.reloadTab(gBrowser.selectedTab);
+        },
+        all() {
+            gBrowser.reloadTabs(gBrowser.openTabs);
         }
     },
     pin: {
@@ -460,16 +452,16 @@
             gBrowser.pinTab(gBrowser.selectedTab);
         },
         all(event) {
-            gBrowser.tabs.forEach(t => gBrowser.pinTab(t));
-        },
+            gBrowser.pinMultiSelectedTabs(gBrowser.openTabs);
+        }
     },
     unpin: {
         current() {
             gBrowser.unpinTab(gBrowser.selectedTab);
         },
         all(event) {
-            gBrowser.tabs.forEach(t => gBrowser.unpinTab(t));
-        },
+            gBrowser.unpinMultiSelectedTabs(gBrowser.openTabs);
+        }
     },
     "toggle-pin": {
         current() {
@@ -478,8 +470,11 @@
             else
                 gBrowser.pinTab(gBrowser.selectedTab);
         },
-        all(event) {
-        },
+        all() {
+        }
+    },
+    undo() {
+        //gBrowser.undoRemoveTab();
     },
     prev() {
         gBrowser.tabContainer.advanceSelectedTab(-1, true);
@@ -494,12 +489,9 @@
 (function() {
     //  fix for 92+ port Bug 1723723 - Switch JS consumers from getURLSpecFromFile to either getURLSpecFromActualFile or getURLSpecFromDir
     const fph = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler);
-
-    const getFileURLSpec = "getURLSpecFromFile" in fph ?
+    return "getURLSpecFromFile" in fph ?
         f => fph.getURLSpecFromFile(f) :
         f => fph.getURLSpecFromActualFile(f);
-
-    return getFileURLSpec;
 })(),
 function(path) {
     var aFile = Cc["@mozilla.org/file/directory_service;1"]
@@ -521,9 +513,9 @@ function(path) {
 },
 (() => {
     // Bug 1817443 - remove openUILinkIn entirely
-    return "openTrustedLinkIn" in window ? function (url, where, params) {
+    return "openTrustedLinkIn" in window ? function(url, where, params) {
         return openTrustedLinkIn(url, where, params);
-    } (url, where, params) {
+    } : function(url, where, params) {
         return openUILinkIn(url, where, params);
     }
 })(),

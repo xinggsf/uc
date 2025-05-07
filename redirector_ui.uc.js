@@ -11,15 +11,27 @@
 
 // https://raw.githubusercontent.com/Harv/userChromeJS/master/redirector_ui.uc.js
 (function() {
-    const { XPCOMUtils,Services,NetUtil,FileUtils } = globalThis;
+    const { Services,NetUtil,FileUtils } = globalThis;
 	const $ = id => document.getElementById(id);
 	const $$ = (css, context = document) => context.querySelectorAll(css);
+    // let bytes = await IOUtils.read(path, { decompress: true }); // Uint8Array compression: 'lz4'
+    // let utf8 = await IOUtils.readUTF8(path, { decompress: true }); // string compression: 'lz4'
+    // await IOUtils.write(path, bytes, { compress: true }); // Uint8Array
+    // await IOUtils.writeUTF8(path, str, { compress: true }); // string
+	const loadTextFile = async(path) => {
+	    try {
+            const data = await IOUtils.readUTF8(path);
+            return decodeURIComponent(escape(data));
+	    } catch (ex) {
+	        console.error(ex);
+	    }
+	};
 
 	class Redirector {
 		constructor() {
 			this.rules = [];
 			this.redirectUrls = {};
-			this.QueryInterface = (ChromeUtils.generateQI || XPCOMUtils.generateQI)([Ci.nsIObserver, Ci.nsIFactory, Ci.nsISupports]);
+			this.QueryInterface = ChromeUtils.generateQI([Ci.nsIObserver, Ci.nsIFactory, Ci.nsISupports]);
 		}
         on() {
             Services.obs.addObserver(this, "http-on-modify-request", false);
@@ -76,7 +88,7 @@
                     const channel = ChannelWrapper.get(subject);
                     // console.log(channel);
                     const redirectUrl = this.getRedirectUrl(channel.channel.URI.spec);
-                    if (redirectUrl/* && !redirectUrl.resp*/) {						
+                    if (redirectUrl/* && !redirectUrl.resp*/) {
                         channel.channel.cancel(Cr.NS_BINDING_REDIRECTED); // NS_BINDING_ABORTED
                         let loadingContext = (channel.channel.notificationCallbacks || channel.channel.loadGroup.notificationCallbacks).getInterface(Ci.nsILoadContext);
                         let webNavigation = loadingContext.topFrameElement.webNavigation;
@@ -84,7 +96,7 @@
                         loadURI.call(webNavigation, redirectUrl.url, {
                             triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({}),
                         });
-                        /* 
+                        /*
 						channel.channel.suspend();
                         const newURI = Services.io.newURI(redirectUrl.url);
                         channel.redirectTo(newURI);
@@ -128,7 +140,7 @@
         get redirector() {
             if (!Services.redirector) {
                 let state = this.state;
-                XPCOMUtils.defineLazyGetter(Services, "redirector", function() {
+                ChromeUtils.defineLazyGetter(Services, "redirector", function() {
                     let redirector = new Redirector();
                     redirector.clearCache = function() {
                         this.redirectUrls = {};
@@ -303,7 +315,7 @@
         }
         edit() {
             let editor,aFile = FileUtils.getDir("UChrm", this.rules, true);
-            if (!aFile || !aFile.exists() || !aFile.isFile()) return;
+            if (!aFile?.exists() || !aFile.isFile()) return;
             try {
                 editor = Services.prefs.getComplexValue("view_source.editor.path", Ci.nsIFile);
             } catch (e) {
@@ -334,14 +346,14 @@
             event.preventDefault();
         }
         // nsIMessageListener interface implementation
-        receiveMessage(message) {
-            if (this.hash == message.data.hash) return;
-            switch (message.name) {
+        receiveMessage({name, data: {hash, item}}) {
+            if (this.hash == hash) return;
+            switch (name) {
                 case "redirector:toggle":
                     this.toggle(null, true);
                     break;
                 case "redirector:toggle-item":
-                    this.toggle(message.data.item, true);
+                    this.toggle(item, true);
                     break;
                 case "redirector:reload":
                     this.reload(true);
