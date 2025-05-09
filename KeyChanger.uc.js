@@ -437,6 +437,9 @@
         },
         toEnd() {
             gBrowser.removeTabsToTheEndFrom(gBrowser.selectedTab);
+        },
+        toStart() {
+            gBrowser.removeTabsToTheStartFrom(gBrowser.selectedTab);
         }
     },
     reload: {

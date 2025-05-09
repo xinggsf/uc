@@ -1,5 +1,5 @@
 // =====================addmenuplus 配置 感谢 runningcheese ======================
-const _IS_HZ = locale.includes("zh-");
+const _IS_HZ = locale.startsWith("zh");
 app([{
     'insertAfter': 'appMenu-settings-button',
 }, {

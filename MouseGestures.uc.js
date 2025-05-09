@@ -132,8 +132,8 @@
 		'RDL': {
 			name: '打开书签工具栏',
 			cmd(event) {
-				var bar = $("PersonalToolbar");
-				setToolbarVisibility(bar, bar.collapsed);
+				const bar = $("PlacesToolbar");
+				bar.collapsed = !bar.collapsed;
 			}
 		},
 		'RLRL': {
@@ -154,19 +154,14 @@
 				$("pageAction-urlbar-_cd7e22de-2e34-40f0-aeff-cec824cbccac_").click();
 			}
 		},
-		'RULDR': {
-			name: '添加到稍后阅读',
-			cmd(event) {
-				$("pageAction-urlbar-_cd7e22de-2e34-40f0-aeff-cec824cbccac_").click();
-			}
-		},
 		'LDL': {
 			name: '关闭左侧标签页',
 			cmd(event) {
-				for (let i = gBrowser.selectedTab._tPos - 1; i >= 0; i--)
-				if (!gBrowser.tabs[i].pinned) {
-					gBrowser.removeTab(gBrowser.tabs[i], {animate: true});
-				}
+				gBrowser.removeTabsToTheStartFrom(gBrowser.selectedTab);
+				// for (let i = gBrowser.selectedTab._tPos - 1; i >= 0; i--)
+				// if (!gBrowser.tabs[i].pinned) {
+					// gBrowser.removeTab(gBrowser.tabs[i], {animate: true});
+				// }
 			}
 		},
 		'RDR': {
@@ -178,7 +173,7 @@
 		'LDRUL': {
 			name: '打开鼠标手势设置文件',
 			cmd(event) {
-				FileUtils.getFile('UChrm', ['SubScript', 'MouseGestures.uc.js']).launch();
+				FileUtils.getDir('UChrm', ['SubScript', 'MouseGestures.uc.js']).launch();
 			}
 		},
 		'RLD': {
@@ -302,17 +297,19 @@
 //将当前窗口置顶
 function TabStickOnTop() {
 	try {
-		Cu.import("resource://gre/modules/ctypes.jsm");
+		const { ctypes, ctypes: {
+			int32_t: i32
+		}} = ChromeUtils.importESModule("resource://gre/modules/ctypes.sys.mjs");
 		const lib = ctypes.open("user32.dll");
 		let funcActiveWindow = 0;
 		let funcSetWindowPos = 0;
 		try {
-			funcActiveWindow = lib.declare("GetActiveWindow", ctypes.winapi_abi, ctypes.int32_t);
-			funcSetWindowPos = lib.declare("SetWindowPos", ctypes.winapi_abi, ctypes.bool, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.uint32_t);
+			funcActiveWindow = lib.declare("GetActiveWindow", ctypes.winapi_abi, i32);
+			funcSetWindowPos = lib.declare("SetWindowPos", ctypes.winapi_abi, ctypes.bool, i32, i32, i32, i32, i32, i32, ctypes.uint32_t);
 		}
 		catch (ex) {
-			funcActiveWindow = lib.declare("GetActiveWindow", ctypes.stdcall_abi, ctypes.int32_t);
-			funcSetWindowPos = lib.declare("SetWindowPos", ctypes.stdcall_abi, ctypes.bool, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.int32_t, ctypes.uint32_t);
+			funcActiveWindow = lib.declare("GetActiveWindow", ctypes.stdcall_abi, i32);
+			funcSetWindowPos = lib.declare("SetWindowPos", ctypes.stdcall_abi, ctypes.bool, i32, i32, i32, i32, i32, i32, ctypes.uint32_t);
 		}
 		if (funcActiveWindow != 0) {
 			const win = $('main-window');

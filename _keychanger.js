@@ -94,17 +94,17 @@ keys['Alt+Z'] = { //恢复关闭标签页
 keys['Ctrl+SHIFT+V'] = function(e) { //打开剪切板地址
     let url = readFromClipboard();
     try {
-        makeURI(url);
+        switchToTabHavingURI(url, true);
     } catch (ex) {
-        var reg = /^\w[-\w]{0,66}(\.\w[-\w]{0,66}){1,8}\b/;
-        if (!reg.test(url)) {
-            url = 'https://cn.bing.com/search?q='+ encodeURIComponent(url);
-        } else {
-            url = decodeURIComponent(url);
+        url = decodeURIComponent(url);
+        const reg = /\b\w[-\w]{0,66}(\.\w[-\w]{0,66}){1,8}\b/;
+        if (reg.test(url)) {
             if (!/^https?:\/\//i.test(url)) url = 'http://'+ url;
+        } else {
+            url = 'https://cn.bing.com/search?q='+ url;
         }
+        switchToTabHavingURI(url, true);
     }
-    switchToTabHavingURI(url, true);
     //e.preventDefault();
     //e.stopPropagation();
 };

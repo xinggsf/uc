@@ -89,11 +89,6 @@
         EXCLUDE_CHROMEHIDDEN: EXCLUDE_CHROMEHIDDEN,
         REPLACECACHE: REPLACECACHE,
 
-        get hackVersion() {
-            return "0.8";
-        },
-
-        //スクリプトデータを作成
         getScripts() {
             const fph = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler);
             const ds = Services.dirsvc;
@@ -205,7 +200,7 @@
                 const charset = header.match(/\/\/ @charset\s+(\S+)/i)?.[1] || "";
                 const async_ = /\/\/ @async\b/i.test(header);
 
-                const if (isLongDescription)  = (/^\/\/\ @long-description/im).test(header);
+                const isLongDescription = /^\/\/ @long-description/im.test(header);
                 description = isLongDescription
                     ? header.match(/\/\/ @description\s+.*?\/\*\s*(.+?)\s*\*\//is)?.[1]
                     : header.match(/\/\/ @description\s+(.+)\s*$/im)?.[1];
@@ -576,9 +571,9 @@
     if (location.href != that.BROWSERCHROME) return;
     window.document.addEventListener("load", function({originalTarget: doc}) {
         if (!doc.location) return;
-        var href = doc.location.href;
+        const href = doc.location.href;
         if (/^(about:(blank|newtab|home))/i.test(href)) return;
-        if (!/^(about:|chrome:)/.test(href)) return;
+        if (!/^(about|chrome):/.test(href)) return;
         // skip for in-content dialog etc.
         if (href.endsWith('Dialog.xhtml')) return;
         if (href == 'chrome://global/content/alerts/alert.xhtml') return;
@@ -610,7 +605,7 @@
             this.sidebarWindow.removeEventListener("unload", this, false);
         },
         load({originalTarget: doc}) {
-            var href = doc.location.href;
+            const href = doc.location.href;
             if (that.INFO) that.debug("load Webpanel " + href);
             setTimeout(function (doc) {
                 that.runScripts(doc);

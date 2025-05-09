@@ -190,8 +190,9 @@ else {
 
         window?.addMenu?.destroy();
 
-        const ADDMENU_LANG = {
-            'zh-CN': {
+        // i18n
+        const _LANG = {
+            'zh': {
                 'config example': '// 这是一个 addMenuPlus 配置文件\n' +
                     '// 请到 http://ywzhaiqi.github.io/addMenu_creator/ 生成配置文件\n\n' +
                     'tab({\n    label: "addMenuPlus 配置",\n    oncommand: "addMenu.edit(addMenu.FILE);"\n});',
@@ -209,7 +210,7 @@ else {
                 'set global editor': '设置全局脚本编辑器',
                 'could not load': '无法载入：%s'
             },
-            'en-US': {
+            'en': {
                 'config example': '// This is an addMenuPlus configuration file.\n' +
                     '// Please visit http://ywzhaiqi.github.io/addMenu_creator/ to generate configuration.' +
                     '\n\n' +
@@ -219,8 +220,6 @@ else {
                 'addmenuplus tooltip': 'Left Click：Reload configuration\nRight Click：Edit configuration',
                 'custom showing method error': 'addMenuPlus customize popupshow error',
                 'url is invalid': 'URL is invalid: %s',
-                'config file': 'Configuration file',
-                'not exists': ' not exists',
                 'check config file with line': '\nPlease recheck line %s of the configuration file',
                 'file not found': 'File not found: %s',
                 'config has reload': 'The configuration has been reloaded',
@@ -228,22 +227,9 @@ else {
                 'set global editor': 'Setting up the global script editor',
                 'could not load': 'Could not load：%s'
             },
-        }
-
-        // 读取语言代码
-        let _locale;
-        try {
-            const osPrefs = Cc["@mozilla.org/intl/ospreferences;1"].getService(Ci.mozIOSPreferences);
-            const _locales = osPrefs.hasOwnProperty("getRegionalPrefsLocales") ?
-                osPrefs.getRegionalPrefsLocales() : osPrefs.regionalPrefsLocales;
-            for (let i = 0; i < _locales.length; i++) {
-                if (ADDMENU_LANG.hasOwnProperty(_locales[i])) {
-                    _locale = _locales[i];
-                    break;
-                }
-            }
-        } catch (e) { }
-        const ADDMENU_LOCALE = _locale || "en-US";
+        };
+        const _LOCALE = Services.prefs.getCharPref("general.useragent.locale", "zh-CN").split('-')[0];
+        const LANG = _LANG[_LOCALE] || _LANG.en;
 
         // 增加菜单类型请在这里加入插入点，名称不能是 ident 或者 group
         const MENU_ATTRS = {
@@ -317,7 +303,7 @@ else {
                 return typeof Localization == "function";
             },
             get locale() {
-                return ADDMENU_LOCALE || "en-US";
+                return _LOCALE || "en";
             },
             get panelId() {
                 return this.panelId = Math.floor(Math.random() * 900000 + 99999);
@@ -1590,9 +1576,9 @@ else {
             },
         };
 
-        function $(id, doc=document) {
+        function $(id, doc = document) {
             if (!id) return;
-            if (/[, \.\[\(\>]/.test(id)) return doc.querySelector(id);
+            if (/[, \>\.\[\(]|^:/.test(id)) return doc.querySelector(id);
             return doc.getElementById(id.startsWith("#") ? id.substring(1) : id);
         }
 
@@ -1652,10 +1638,8 @@ else {
         }
 
         function $L(key, ...repl) {
-            if (!key) return "";
-            if (!ADDMENU_LANG[ADDMENU_LOCALE].hasOwnProperty(key)) return capitalize(key);
             let i = 0;
-            return ADDMENU_LANG[ADDMENU_LOCALE][key].replaceAll('%s', x => repl[i++]);
+            return LANG[key]?.replaceAll('%s', x => repl[i++]) || capitalize(key);
         }
 
         function isDef(v) {
