@@ -349,6 +349,10 @@
                 console.error(ex);
             }
         },
+        copy(aText) {
+            Cc["@mozilla.org/widget/clipboardhelper;1"]
+                .getService(Ci.nsIClipboardHelper).copyString(aText);
+        },
         openUILinkIn(url, where, aAllowThirdPartyFixup, aPostData = null, aReferrerInfo = null) {
             const r = { ...aAllowThirdPartyFixup };
             r.triggeringPrincipal ||= where === 'current' ? gBrowser.selectedBrowser.contentPrincipal : (

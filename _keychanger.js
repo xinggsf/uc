@@ -60,11 +60,12 @@ keys['Alt+F'] = function() { //显示或隐藏书签栏， 自带按键 Ctrl+Shi
     var bar = document.getElementById("PersonalToolbar");
     bar.collapsed = !bar.collapsed;
 };
-keys['Alt+G'] = function(event) { //Google站内搜索
+keys['Alt+G'] = function({target}) { //Google站内搜索
     let sel = KeyChanger.getSelectedText(),
-        win = event.target.ownerGlobal;
+        win = target.ownerGlobal;
     if (!sel.length) {
-        sel = win.prompt(Services.locale.appLocaleAsBCP47.includes("zh-") ? '请输入搜索的关键词:' : 'Please input keyword:', '');
+        const title = Services.locale.appLocaleAsBCP47.includes("zh-") ? '请输入搜索的关键词:' : 'Please input keyword:';
+        sel = win.prompt(title, '');
     }
     if (sel) {
         let url = encodeURIComponent(win.gBrowser.currentURI.host);
@@ -84,8 +85,8 @@ keys['Alt+B'] = function(event) {//bing站内搜索
         KeyChanger.openCommand(url);
     }
 };
-keys['Alt+I'] = function(event) { //查看页面信息
-    event.target.ownerGlobal.BrowserPageInfo();
+keys['Alt+I'] = function({target}) { //查看页面信息
+    target.ownerGlobal.BrowserPageInfo();
 };
 keys['Alt+Z'] = { //恢复关闭标签页
     oncommand: "internal",
@@ -111,16 +112,14 @@ keys['Ctrl+SHIFT+V'] = function(e) { //打开剪切板地址
 keys['Alt+C'] = function() { //复制当前网页 Markdown 链接
     const url = gBrowser.currentURI.spec;
     const title = gBrowser.contentTitle;
-    const txt = `[${title}](${url})`;
-    Cc['@mozilla.org/widget/clipboardhelper;1'].getService(Ci.nsIClipboardHelper).copyString(txt);
+    KeyChanger.copy(`[${title}](${url})`);
 };
-keys['Ctrl+Shift+Alt+C'] = function() { //复制所有网页 Markdown 链接
-    var txt = "";
-    gBrowser.tabs.forEach(function(tab) {
-        var url = gBrowser.getBrowserForTab(tab).currentURI.spec;
-        txt = `${txt}[${tab.label}](${url})\n`;
-    });
-    Cc['@mozilla.org/widget/clipboardhelper;1'].getService(Ci.nsIClipboardHelper).copyString(txt);
+keys['Ctrl+Shift+Alt+C'] = function() { //复制所有标签页 Markdown 链接
+    const txt = gBrowser.tabs.map(function(tab) {
+        const url = gBrowser.getBrowserForTab(tab).currentURI.spec;
+        return `[${tab.label}](${url})`;
+    }).join('\n');
+    KeyChanger.copy(txt);
 };
 //Ctrl+Shift 组合键 --------------------------------------------------------------------------------------------------------
 keys['Ctrl+Shift+F5'] = { //刷新所有标签页
