@@ -475,6 +475,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 					function htmlEscape(s) {
 						return (s + "").replaceAll('&', "&amp;").replaceAll('>', "&gt;").replaceAll('<', "&lt;").replaceAll(`"`, "&quot;").replaceAll(`'`, "&apos;");
 					}
+				}
 				break;
 			case 'nodeType':
 				let state = [];
