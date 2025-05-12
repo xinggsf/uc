@@ -542,12 +542,13 @@ else {
 
                     this.customShowings?.forEach(function(obj) {
                         if (obj.insertPoint !== insertPoint) return;
-                        var curItem = obj.item;
+                        let {item, fnSource: fn} = obj;
+                        if (typeof fn == 'function') fn = fn.toString();
+                        if (!fn.startsWith('function')) fn = 'function ' + fn;
                         try {
-                            eval('(' + obj.fnSource + ').call(curItem, curItem)');
-                            //obj.fnSource?.call(window, curItem)
+                            eval(`(${fn}).call(item, item)`);
                         } catch (ex) {
-                            error($L('custom showing method error'), obj.fnSource, ex);
+                            error($L('custom showing method error'), fn, ex);
                         }
                     });
 
@@ -1248,11 +1249,12 @@ else {
                     }
                 }
                 const setIconCallback = function(url) {
+                    if (!url) return;
                     let uri;
                     try {
                         uri = Services.io.newURI(url, null, null);
                     } catch (e) {
-                        return log(e)
+                        return log(url, e)
                     }
 
                     menu.setAttribute("scheme", uri.scheme);
@@ -1270,7 +1272,7 @@ else {
                     const url = entry ? entry.url.href :
                         (obj.url + '').replace(this.regexp, "");
                     setIconCallback(url);
-                }, log).catch(error);
+                }).catch(error);
             },
             setCondition(menu, { condition }, opt = {}) {
                 if (condition) {
@@ -1304,11 +1306,9 @@ else {
 
                 return text.replace(this.regexp, function (str) {
                     str = str.toUpperCase().replace("%LINK", "%RLINK");
-                    if (str.indexOf("_HTMLIFIED") >= 0)
-                        return htmlEscape(convert(str.replace("_HTMLIFIED", "")));
-                    if (str.indexOf("_HTML") >= 0)
-                        return htmlEscape(convert(str.replace("_HTML", "")));
-                    if (str.indexOf("_ENCODE") >= 0)
+                    if (str.includes("_HTML"))
+                        return htmlEscape(convert(str.replace(/_HTML(IFIED)?/, "")));
+                    if (str.includes("_ENCODE"))
                         return encodeURIComponent(convert(str.replace("_ENCODE", "")));
                     return convert(str);
                 });

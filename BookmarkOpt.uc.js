@@ -5,17 +5,15 @@
 // @shutdown        window.BookmarkOpt.destroy();
 // @include         main
 // @include         chrome://browser/content/places/places.xhtml
-// @include         chrome://browser/content/places/places.xul
 // @include         chrome://browser/content/places/bookmarksSidebar.xhtml
-// @include         chrome://browser/content/bookmarks/bookmarksPanel.xul
 // @include         chrome://browser/content/places/historySidebar.xhtml
-// @include         chrome://browser/content/history/history-panel.xul
 // @version         1.4.6
-// @compatibility   Firefox 74
+// @compatibility   Firefox 136
 // @homepageURL     https://github.com/benzBrake/FirefoxCustomize/tree/master/userChromeJS
 // ==/UserScript==
+
 /*
-添加书签到此处/更新书签，复制标题，复制Markdown格式链接，增加显示/隐藏书签工具栏按钮，中按点击书签工具栏文件夹收藏当前页面到该文件夹下,书签工具栏更多菜单自动适应弹出位置，Shift+右键可复制查看内部 ID
+添加书签到此处、更新书签、复制标题、复制Markdown格式链接、增加显示/隐藏书签工具栏按钮、中键点击书签工具栏文件夹收藏当前页面到该文件夹下、书签工具栏更多菜单自动适应弹出位置，Shift+右键可复制查看内部 ID
 
 开关：
 userChromeJS.BookmarkOpt.enableToggleButton: 显示/隐藏书签工具栏按钮
@@ -23,9 +21,6 @@ userChromeJS.BookmarkOpt.doubleClickToShow: 双击地址栏切换书签工具栏
 userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签工具栏的图标（书签，文件夹均可）添加书签
 */
 (function(css, imp, firstUpperCase, add_style, copy_text, $, create_el, add_events, remove_events) {
-	const Services = imp("Services");
-	const PlacesUIUtils = imp("PlacesUIUtils");
-	const PlacesUtils = imp("PlacesUtils");
 	// Bug 1904909 PlacesUtils::GatherDataText and GatherDataHtml should not recurse into queries
 	PlacesUtils.nodeIsFolder ||= PlacesUtils.nodeIsFolderOrShortcut;
 	const NODEIS_T = ['bookmark', 'container', 'day', 'folder', 'historyContainer', 'host', 'query', 'separator', 'tagQuery'];
@@ -59,7 +54,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 		return LANG[key]?.replaceAll('%s', x => repl[i++]) || firstUpperCase(key);
 	};
 
-	// 右键菜单
+	// 右键菜单 ppm.anchorNode
 	const PLACES_CONTEXT_ITEMS = [{
 		id: 'placesContext_add:bookmark',
 		label: $L("add bookmark here"),
@@ -133,16 +128,11 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 
 	window.BookmarkOpt = {
 		items: [],
+		X_MAIN: '/content/browser.xhtml',
+		widgetID: "BookmarkOpt-Toggle-PersonalToolbar",
 		get topWin() {
 			return Services.wm.getMostRecentWindow("navigator:browser");
 		},
-		X_MAIN: 'chrome://browser/content/browser.xhtml',
-		X_PLACES: 'chrome://browser/content/places/places.xhtml',
-		XUL_PLACES: 'chrome://browser/content/places/places.xul',
-		X_BOOKMARK_SB: 'chrome://browser/content/places/bookmarksSidebar.xhtml',
-		XUL_BOOKMARK_SB: 'chrome://browser/content/bookmarks/bookmarksPanel.xul',
-		X_HISTORY_SB: 'chrome://browser/content/places/historySidebar.xhtml',
-		XUL_HISTORY_SB: 'chrome://browser/content/history/history-panel.xul',
 		init() {
 			let he = "(?:_HTML(?:IFIED)?|_ENCODE)?";
 			let rTITLE = "%TITLE" + he + "%|%t\\b";
@@ -155,7 +145,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 
 			this.style = add_style(css);
 			let el;
-			switch (location.href) {
+			switch (location.pathname) {
 			case this.X_MAIN:
 				el = $("urlbar");
 				if (!el.getAttribute("bmopt-inited")) {
@@ -183,16 +173,15 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 					add_events(el,['mousedown','click'],this);
 					document.addEventListener('mouseup', this);
 				}
-				if (Services.prefs.getBoolPref("userChromeJS.BookmarkOpt.enableToggleButton", false) &&
-					!CustomizableUI.getWidget('BookmarkOpt-Toggle-PersonalToolbar')?.forWindow(window)?.node) {
+				if (Services.prefs.getBoolPref("userChromeJS.BookmarkOpt.enableToggleButton", false)) { // && !CustomizableUI.getWidget(this.widgetID)?.forWindow(window)?.node
 					CustomizableUI.createWidget({
-						id: 'BookmarkOpt-Toggle-PersonalToolbar',
+						id: this.widgetID,
 						removable: true,
 						defaultArea: CustomizableUI.AREA_NAVBAR,
 						type: "custom",
 						onBuild: (doc) => {
 							let btn = create_el('toolbarbutton', {
-								id: 'BookmarkOpt-Toggle-PersonalToolbar',
+								id: this.widgetID,
 								label: $L("toggle personalToolbar"),
 								tooltiptext: $L("toggle personalToolbar"),
 								style: 'list-style-image: url("chrome://browser/skin/bookmarks-toolbar.svg");',
@@ -203,12 +192,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 						}
 					});
 				}
-			case this.X_PLACES:
-			case this.XUL_PLACES:
-			case this.X_BOOKMARK_SB:
-			case this.XUL_BOOKMARK_SB:
-			case this.X_HISTORY_SB:
-			case this.XUL_HISTORY_SB:
+			default:
 				el = $('placesContext');
 				if (el.getAttribute("bmopt-inited")) return;
 				const ins = $("placesContext_createBookmark");
@@ -229,166 +213,156 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 		destroy() {
 			this.style?.remove();
 			let el;
-			switch (location.href) {
+			switch (location.pathname) {
 			case this.X_MAIN:
 				el = $('urlbar');
 				el.removeEventListener('dblclick', this);
 				el.removeAttribute('bmopt-inited');
 				this.items.forEach(e => e.remove());
+				try {
+					CustomizableUI.destroyWidget(this.widgetID);
+				} catch (ex) { }
 				el = $('PlacesToolbar');
 				if (el) {
 					remove_events(el, ['popupshowing', 'popuphidden'], this);
 					el.removeAttribute('bmopt-inited');
 					$('PlacesChevronPopup').removeEventListener('popuphidden', this);
-					try {
-						CustomizableUI.destroyWidget("BookmarkOpt-Toggle-PersonalToolbar");
-					} catch (ex) { }
 				}
 				if ($('PlacesToolbarItems')) {
 					remove_events($('PlacesToolbarItems'), ['mousedown', 'click']);
 					document.removeEventListener('mouseup', this);
 				}
 				this.PlacesChevronObserver?.disconnect();
-			case this.X_PLACES:
-			case this.XUL_PLACES:
-			case this.X_BOOKMARK_SB:
-			case this.XUL_BOOKMARK_SB:
-			case this.X_HISTORY_SB:
-			case this.XUL_HISTORY_SB:
+			default:
 				el = $("placesContext");
 				remove_events(el, ['popupshowing', 'popuphidden'], this);
 				el.removeAttribute('bmopt-inited');
 				this.clearPanelItems(document);
 				break;
 			}
-			delete window.BookmarkOpt;
+			delete this;
 		},
-		handleEvent(event) {
-			const { target, button, type } = event;
-			const { document: doc } = target.ownerGlobal;
-			switch (type) {
-			case 'click':
-				if (button == 1 && isMouseDown) {
-					let addBookmark = false;
-					if (Services.prefs.getBoolPref(
-						"userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly", false)
-						&& !target.hasAttribute("query") /* 排除最近访问 */
-					) {
-						let left = target.getBoundingClientRect().left;
-						let x = event.clientX - left; // 鼠标点击位置相对于当前书签
-						let icon = target.matches("toolbarbutton") ?
+		handleEvent(e) {
+			this[e.type](e);
+		},
+		click(event) {
+			const { target, button, clientX } = event;
+			if (button == 1 && isMouseDown) {
+				let addBookmark = false;
+				if (Services.prefs.getBoolPref(
+					"userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly", false)
+					&& !target.hasAttribute("query") /* 排除最近访问 */
+				) {
+					let icon = target.matches("toolbarbutton") ?
+						target.querySelector(":scope>image") : target.firstChild;
+					let { left, width } = icon.getBoundingClientRect();
+					// 点击的是标签，不覆盖默认的功能：打开全部
+					addBookmark = clientX < left + width;
+				}
+				if (addBookmark) {
+					event.preventDefault();
+					event.stopPropagation();
+					this.operate(event, 'add', target, (...args) => {
+						const icon = target.matches("toolbarbutton") ?
 							target.querySelector(":scope>image") : target.firstChild;
-						let iconRect = icon.getBoundingClientRect();
-						let paddingLeft = iconRect.left - left;
-						if (x < paddingLeft + iconRect.width) {
-							// 点击的是标签，不覆盖默认的功能：打开全部
-							addBookmark = true;
+						const src = icon.getAttribute('src');
+						if (!src?.endsWith('N3oiLz48L3N2Zz4=')) {
+							icon.setAttribute('original-src', src);
 						}
-					}
-					if (addBookmark) {
-						event.preventDefault();
-						event.stopPropagation();
-						this.operate(event, 'add', target, (...args) => {
-							const icon = target.matches("toolbarbutton") ?
-								target.querySelector(":scope>image") : target.firstChild;
-							const src = icon.getAttribute('src');
-							if (!src?.endsWith('N3oiLz48L3N2Zz4=')) {
-								icon.setAttribute('original-src', src);
-							}
-							icon.setAttribute('src', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiB0cmFuc2Zvcm09InNjYWxlKDEuMSkiPjxsaW5lYXJHcmFkaWVudCBpZD0iNXp6TUdWUW5OX1F5UllXR21KVXNRYSIgeDE9IjkuODU4IiB4Mj0iMzguMTQyIiB5MT0iOS44NTgiIHkyPSIzOC4xNDIiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMyMWFkNjQiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwODgyNDIiLz48L2xpbmVhckdyYWRpZW50PjxwYXRoIGZpbGw9InVybCgjNXp6TUdWUW5OX1F5UllXR21KVXNRYSkiIGQ9Ik00NCwyNGMwLDExLjA0NS04Ljk1NSwyMC0yMCwyMFM0LDM1LjA0NSw0LDI0UzEyLjk1NSw0LDI0LDRTNDQsMTIuOTU1LDQ0LDI0eiIvPjxwYXRoIGQ9Ik0zMi4xNzIsMTYuMTcyTDIyLDI2LjM0NGwtNS4xNzItNS4xNzJjLTAuNzgxLTAuNzgxLTIuMDQ3LTAuNzgxLTIuODI4LDBsLTEuNDE0LDEuNDE0Yy0wLjc4MSwwLjc4MS0wLjc4MSwyLjA0NywwLDIuODI4bDgsOGMwLjc4MSwwLjc4MSwyLjA0NywwLjc4MSwyLjgyOCwwbDEzLTEzYzAuNzgxLTAuNzgxLDAuNzgxLTIuMDQ3LDAtMi44MjhMMzUsMTYuMTcyQzM0LjIxOSwxNS4zOTEsMzIuOTUzLDE1LjM5MSwzMi4xNzIsMTYuMTcyeiIgb3BhY2l0eT0iLjA1Ii8+PHBhdGggZD0iTTIwLjkzOSwzMy4wNjFsLTgtOGMtMC41ODYtMC41ODYtMC41ODYtMS41MzYsMC0yLjEyMWwxLjQxNC0xLjQxNGMwLjU4Ni0wLjU4NiwxLjUzNi0wLjU4NiwyLjEyMSwwTDIyLDI3LjA1MWwxMC41MjUtMTAuNTI1YzAuNTg2LTAuNTg2LDEuNTM2LTAuNTg2LDIuMTIxLDBsMS40MTQsMS40MTRjMC41ODYsMC41ODYsMC41ODYsMS41MzYsMCwyLjEyMWwtMTMsMTNDMjIuNDc1LDMzLjY0NiwyMS41MjUsMzMuNjQ2LDIwLjkzOSwzMy4wNjF6IiBvcGFjaXR5PSIuMDciLz48cGF0aCBmaWxsPSIjZmZmIiBkPSJNMjEuMjkzLDMyLjcwN2wtOC04Yy0wLjM5MS0wLjM5MS0wLjM5MS0xLjAyNCwwLTEuNDE0bDEuNDE0LTEuNDE0YzAuMzkxLTAuMzkxLDEuMDI0LTAuMzkxLDEuNDE0LDBMMjIsMjcuNzU4bDEwLjg3OS0xMC44NzljMC4zOTEtMC4zOTEsMS4wMjQtMC4zOTEsMS40MTQsMGwxLjQxNCwxLjQxNGMwLjM5MSwwLjM5MSwwLjM5MSwxLjAyNCwwLDEuNDE0bC0xMywxM0MyMi4zMTcsMzMuMDk4LDIxLjY4MywzMy4wOTgsMjEuMjkzLDMyLjcwN3oiLz48L3N2Zz4=');
-							setTimeout(() => {
-								for (let img of target.querySelectorAll('image[src$="LjcwN3oiLz48L3N2Zz4="]')) {
-									const src = img.getAttribute('original-src');
-									if (src) {
-										img.setAttribute('src', src);
-										img.removeAttribute('original-src');
-									} else {
-										img.removeAttribute('src');
-									}
+						icon.setAttribute('src', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiB0cmFuc2Zvcm09InNjYWxlKDEuMSkiPjxsaW5lYXJHcmFkaWVudCBpZD0iNXp6TUdWUW5OX1F5UllXR21KVXNRYSIgeDE9IjkuODU4IiB4Mj0iMzguMTQyIiB5MT0iOS44NTgiIHkyPSIzOC4xNDIiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMyMWFkNjQiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwODgyNDIiLz48L2xpbmVhckdyYWRpZW50PjxwYXRoIGZpbGw9InVybCgjNXp6TUdWUW5OX1F5UllXR21KVXNRYSkiIGQ9Ik00NCwyNGMwLDExLjA0NS04Ljk1NSwyMC0yMCwyMFM0LDM1LjA0NSw0LDI0UzEyLjk1NSw0LDI0LDRTNDQsMTIuOTU1LDQ0LDI0eiIvPjxwYXRoIGQ9Ik0zMi4xNzIsMTYuMTcyTDIyLDI2LjM0NGwtNS4xNzItNS4xNzJjLTAuNzgxLTAuNzgxLTIuMDQ3LTAuNzgxLTIuODI4LDBsLTEuNDE0LDEuNDE0Yy0wLjc4MSwwLjc4MS0wLjc4MSwyLjA0NywwLDIuODI4bDgsOGMwLjc4MSwwLjc4MSwyLjA0NywwLjc4MSwyLjgyOCwwbDEzLTEzYzAuNzgxLTAuNzgxLDAuNzgxLTIuMDQ3LDAtMi44MjhMMzUsMTYuMTcyQzM0LjIxOSwxNS4zOTEsMzIuOTUzLDE1LjM5MSwzMi4xNzIsMTYuMTcyeiIgb3BhY2l0eT0iLjA1Ii8+PHBhdGggZD0iTTIwLjkzOSwzMy4wNjFsLTgtOGMtMC41ODYtMC41ODYtMC41ODYtMS41MzYsMC0yLjEyMWwxLjQxNC0xLjQxNGMwLjU4Ni0wLjU4NiwxLjUzNi0wLjU4NiwyLjEyMSwwTDIyLDI3LjA1MWwxMC41MjUtMTAuNTI1YzAuNTg2LTAuNTg2LDEuNTM2LTAuNTg2LDIuMTIxLDBsMS40MTQsMS40MTRjMC41ODYsMC41ODYsMC41ODYsMS41MzYsMCwyLjEyMWwtMTMsMTNDMjIuNDc1LDMzLjY0NiwyMS41MjUsMzMuNjQ2LDIwLjkzOSwzMy4wNjF6IiBvcGFjaXR5PSIuMDciLz48cGF0aCBmaWxsPSIjZmZmIiBkPSJNMjEuMjkzLDMyLjcwN2wtOC04Yy0wLjM5MS0wLjM5MS0wLjM5MS0xLjAyNCwwLTEuNDE0bDEuNDE0LTEuNDE0YzAuMzkxLTAuMzkxLDEuMDI0LTAuMzkxLDEuNDE0LDBMMjIsMjcuNzU4bDEwLjg3OS0xMC44NzljMC4zOTEtMC4zOTEsMS4wMjQtMC4zOTEsMS40MTQsMGwxLjQxNCwxLjQxNGMwLjM5MSwwLjM5MSwwLjM5MSwxLjAyNCwwLDEuNDE0bC0xMywxM0MyMi4zMTcsMzMuMDk4LDIxLjY4MywzMy4wOTgsMjEuMjkzLDMyLjcwN3oiLz48L3N2Zz4=');
+						setTimeout(() => {
+							for (let img of target.querySelectorAll('image[src$="LjcwN3oiLz48L3N2Zz4="]')) {
+								const src = img.getAttribute('original-src');
+								if (src) {
+									img.setAttribute('src', src);
+									img.removeAttribute('original-src');
+								} else {
+									img.removeAttribute('src');
 								}
-							}, 1000);
-						});
-					}
-				}
-				if (target.id !== "BookmarkOpt-Toggle-PersonalToolbar") break;
-			case 'dblclick':
-				if (!target.matches("#urlbar,#urlbar-input,#BookmarkOpt-Toggle-PersonalToolbar")) return;
-				if (Services.prefs.getBoolPref('userChromeJS.BookmarkOpt.doubleClickToShow', true)) {
-					target.diabled = true;
-					setTimeout(() => {
-						const bar = $("PersonalToolbar", doc);
-						bar.collapsed = !bar.collapsed;
-						target.disabled = false;
-					}, 50);
-				}
-				break;
-			case 'popupshowing':
-				if (target.id === 'placesContext') {
-					const state = [],
-						triggerNode = event.currentTarget.triggerNode,
-						aNode = PlacesUIUtils.getViewForNode(triggerNode)?.selectedNode;
-
-					if (aNode) {
-						for (const condition of NODEIS_T) {
-							const func = 'nodeIs' + firstUpperCase(condition);
-							if (PlacesUtils[func](aNode)) state.push(condition);
-						}
-						if (PlacesUtils.nodeIsURI(aNode)) state.push("uri");
-					}
-					if (event.shiftKey) state.push('shift');
-					target.setAttribute('bmopt', state.join(" "));
-				} else {
-					let firstItem = target.firstChild;
-					if (firstItem?.matches('.bmopt')) return;
-					let last;
-					PLACES_POPUP_ITEMS.forEach(c => {
-						let item;
-						if (c.label) {
-							item = create_el('menuitem', c, doc);
-							item.classList.add('bmopt-panel');
-						} else {
-							item = create_el('menuseparator', {
-								'class': 'bmopt-separator'
-							}, target.ownerDocument);
-						}
-						if (last) {
-							last.after(item);
-						} else if (firstItem) {
-							firstItem.before(item);
-						} else {
-							target.appendChild(item);
-						}
-						last = item;
+							}
+						}, 1000);
 					});
 				}
-				break;
-			case 'popuphidden':
-				if (target.id === "placesContext") {
-					target.setAttribute('bmopt', '');
-				} else {
-					this.clearPanelItems(target, true);
-				}
-				break;
-			case 'mousedown':
-				if (button === 1) {
-					if (target.matches("#PlacesToolbar,#PlacesToolbarItems,#PlacesChevron,.bookmark-item:not([query])")) {
-						isMouseDown = true;
+			}
+			this.dblclick(event);
+		},
+		dblclick({target}) {
+			if (!target.matches("#urlbar,#urlbar-input,#"+ this.widgetID)) return;
+			if (Services.prefs.getBoolPref('userChromeJS.BookmarkOpt.doubleClickToShow', true)) {
+				const { document } = target.ownerGlobal;
+				target.diabled = true;
+				setTimeout(() => {
+					const bar = $("PersonalToolbar", document);
+					bar.collapsed = !bar.collapsed;
+					target.disabled = false;
+				}, 50);
+			}
+		},
+		popupshowing({target,shiftKey,currentTarget}) {
+			const { document: doc } = target.ownerGlobal;
+			if (target.id === 'placesContext') {
+				const state = [],
+					triggerNode = currentTarget.triggerNode,
+					aNode = PlacesUIUtils.getViewForNode(triggerNode)?.selectedNode;
+
+				if (aNode) {
+					for (const condition of NODEIS_T) {
+						const func = 'nodeIs' + firstUpperCase(condition);
+						if (PlacesUtils[func](aNode)) state.push(condition);
 					}
-					!Services.prefs.getBoolPref("browser.bookmarks.openInTabClosesMenu", true)
-						&& target.setAttribute("closemenu", "none");
+					if (PlacesUtils.nodeIsURI(aNode)) state.push("uri");
 				}
-				break;
-			case 'mouseup':
-				setTimeout(() => { isMouseDown = false }, 50);
-				break;
-			case 'mouseover':
-				if (target.matches("#PlacesChevron:not([open=true])")) {
-					const { clientY: y } = event;
-					const { innerHeight: h } = target.ownerGlobal;
-					target.querySelector(":scope>menupopup")?.setAttribute("position",
-						y > h / 2 ? "before_start" : "after_end");
+				if (shiftKey) state.push('shift');
+				target.setAttribute('bmopt', state.join(" "));
+			} else {
+				let firstItem = target.firstChild;
+				if (firstItem?.matches('.bmopt')) return;
+				let last;
+				PLACES_POPUP_ITEMS.forEach(c => {
+					let item;
+					if (c.label) {
+						item = create_el('menuitem', c, doc);
+						item.classList.add('bmopt-panel');
+					} else {
+						item = create_el('menuseparator', {
+							'class': 'bmopt-separator'
+						}, doc);
+					}
+					if (last) {
+						last.after(item);
+					} else if (firstItem) {
+						firstItem.before(item);
+					} else {
+						target.appendChild(item);
+					}
+					last = item;
+				});
+			}
+		},
+		popuphidden({target}) {
+			if (target.id === "placesContext") {
+				target.setAttribute('bmopt', '');
+			} else {
+				this.clearPanelItems(target, true);
+			}
+		},
+		mousedown({target,button}) {
+			if (button === 1) {
+				if (target.matches("#PlacesToolbar,#PlacesToolbarItems,#PlacesChevron,.bookmark-item:not([query])")) {
+					isMouseDown = true;
 				}
-				break;
+				!Services.prefs.getBoolPref("browser.bookmarks.openInTabClosesMenu", true)
+					&& target.setAttribute("closemenu", "none");
+			}
+		},
+		mouseup() {
+			setTimeout(() => { isMouseDown = false }, 50);
+		},
+		mouseover({ target, clientY }) {
+			if (target.matches("#PlacesChevron:not([open=true])")) {
+				const { innerHeight: h } = target.ownerGlobal;
+				target.querySelector(":scope>menupopup")?.setAttribute("position",
+					clientY > h / 2 ? "before_start" : "after_end");
 			}
 		},
 		clearPanelItems(target, do_not_recursive = false) {
@@ -479,7 +453,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 					return text.replace(BookmarkOpt.regexp, function(str) {
 						str = str.toUpperCase().replace("%LINK", "%RLINK");
 						if (str.includes("_HTML"))
-							return escape(convert(str.replace(/_HTML(IFIED)?/, "")));
+							return htmlEscape(convert(str.replace(/_HTML(IFIED)?/, "")));
 						if (str.includes("_ENCODE"))
 							return encodeURIComponent(convert(str.replace("_ENCODE", "")));
 						return convert(str);
@@ -490,14 +464,17 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 						case "%TITLE%":
 							return node.title.replaceAll('[', "【").replaceAll(']', "】");
 						case "%U":
-						case "%URL%": return node.uri;
+						case "%URL%":
+							return node.uri;
 						case "%H":
 						case "%HOST%":
 							return Services.io.newURI(node.uri).host;
 						default: return '';
 						}
 					}
-				}
+					function htmlEscape(s) {
+						return (s + "").replaceAll('&', "&amp;").replaceAll('>', "&gt;").replaceAll('<', "&lt;").replaceAll(`"`, "&quot;").replaceAll(`'`, "&apos;");
+					}
 				break;
 			case 'nodeType':
 				let state = [];
@@ -549,14 +526,10 @@ function imp(name) {
 //单词首字母大写  /\b[a-z]/g
 (txt='') => txt.replace(/^[a-z]/, s => s.toUpperCase()),
 // 插入样式表
-(css) => {
-	const pi = document.createProcessingInstruction(
-		'xml-stylesheet',
-		`type="text/css" href="data:text/css;utf-8,${encodeURIComponent(css)}"`
-	);
-	document.documentElement.before(pi);
-	return pi;
-},
+(css) => document.head.appendChild(document.createProcessingInstruction(
+	'xml-stylesheet',
+	`type="text/css" href="data:text/css;utf-8,${encodeURIComponent(css)}"`
+)),
 (txt) => {
 	Cc["@mozilla.org/widget/clipboardhelper;1"]
 		.getService(Ci.nsIClipboardHelper).copyString(txt);

@@ -366,7 +366,6 @@
         },
         async init() {
             await delayedStartupPromise;
-            this.log('init');
             this.createMenuitem();
             this.makeKeyset();
             this.addEventListener();
