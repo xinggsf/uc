@@ -99,10 +99,6 @@
             if (!str) return null;
 
             const sandbox = new Cu.Sandbox(new XPCNativeWrapper(window));
-            Object.assign(sandbox, {
-                Cc, Ci, Cr, Cu, Services,
-                'KeyChanger': this
-            });
             const keys = Cu.evalInSandbox(`var keys={};${str};keys;`, sandbox);
             if (!keys) return null;
             const dFrag = document.createDocumentFragment();
@@ -480,7 +476,11 @@
         }
     },
     undo() {
-        //gBrowser.undoRemoveTab();
+        try {
+            undoCloseTab();
+        } catch (ex) {
+            $('History:UndoCloseTab').doCommand();
+        }
     },
     prev() {
         gBrowser.tabContainer.advanceSelectedTab(-1, true);

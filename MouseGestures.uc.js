@@ -37,7 +37,7 @@
 		'DU': {
 			name: '网址根目录',
 			cmd() {
-				const u = Services.io.newURI("javascript:document.location.href=location.origin+'/'");
+				const u = Services.io.newURI("javascript:location.replace(location.origin);");
 				gBrowser.loadURI(u, {
 					triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
 				});
@@ -49,15 +49,15 @@
 		},
 		'RL': {
 			name: '打开新标签',
-			cmd: () => BrowserOpenTab()
+			cmd: () => BrowserCommands.openTab()
 		},
 		'LR': {
 			name: '恢复关闭的标签',
 			cmd() {
 				try {
-					$('History:UndoCloseTab').doCommand();
-				} catch (ex) {
-					gBrowser.undoRemoveTab?.();
+            undoCloseTab();
+        } catch (ex) {
+            $('History:UndoCloseTab').doCommand();
 				}
 			}
 		},
@@ -87,7 +87,7 @@
 			}
 		},
 		'DL': {
-			name: '添加/移除书签',
+			name: '添加书签',
 			cmd: () => $("Browser:AddBookmarkAs").doCommand()
 		},
 		'DR': {
@@ -112,7 +112,7 @@
 		},
 		'LU': {
 			name: '查看页面信息',
-			cmd: () => BrowserPageInfo()
+			cmd: () => BrowserCommands.pageInfo()
 		},
 		'LD': {
 			name: '侧边栏打开当前页',

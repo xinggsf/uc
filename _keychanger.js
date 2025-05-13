@@ -1,5 +1,6 @@
 //修改自Firefox 自定义快捷 RunningCheese 版 for 90+
 
+// 函数内 this 即chrome窗口
 //F1-12键 ----------------------------------------------------------------------------------------------
 // 上一个标签页 (内置命令演示)
 keys['F2'] = {
@@ -25,7 +26,7 @@ keys['F4'] = {//克隆当前标签
 };
 //keys['F7'] =""; // 原生功能：启用浏览光标
 keys['F8'] = function(e) { //编辑当前页面
-    KeyChanger.loadURI("javascript:document.body.contentEditable%20=%20'true';%20document.designMode='on';%20void%200");
+    KeyChanger.loadURI("javascript:document.body.contentEditable='true';document.designMode='on';void%200");
 };
 //keys['F9'] = function() {};// 原生功能：进入阅读模式
 keys['F10'] = function() { //解除网页限制
@@ -33,10 +34,9 @@ keys['F10'] = function() { //解除网页限制
 };
 
 //Shift 组合键
-keys['Shift+F1'] = function(event) {
-    var document = event.target.ownerDocument;
+keys['Shift+F1'] = function(event) {//打开调试窗口
     if (!document.getElementById('menu_browserToolbox')) {
-        let { require } = Cu.import("resource://devtools/shared/loader/Loader.jsm", {});
+        let { require } = ChromeUtils.import("resource://devtools/shared/loader/Loader.jsm", {});
         require("devtools/client/framework/devtools-browser");
     };
     document.getElementById('menu_browserToolbox').click();
@@ -56,43 +56,42 @@ keys["Alt+F3"] = {//关闭其他标签页
     params: ['tab','close','other']
 };
 
-keys['Alt+F'] = function() { //显示或隐藏书签栏， 自带按键 Ctrl+Shift+B
+keys['Alt+F'] = function() { //显示或隐藏书签栏，自带按键 Ctrl+Shift+B，FX占用
     var bar = document.getElementById("PersonalToolbar");
     bar.collapsed = !bar.collapsed;
 };
 keys['Alt+G'] = function({target}) { //Google站内搜索
-    let sel = KeyChanger.getSelectedText(),
-        win = target.ownerGlobal;
+    let sel = KeyChanger.getSelectedText();
     if (!sel.length) {
-        const title = Services.locale.appLocaleAsBCP47.includes("zh-") ? '请输入搜索的关键词:' : 'Please input keyword:';
-        sel = win.prompt(title, '');
+        const title = Services.locale.appLocaleAsBCP47.startsWith("zh-") ? '请输入搜索的关键词:' : 'Please input keyword:';
+        sel = prompt(title, '');
     }
     if (sel) {
-        let url = encodeURIComponent(win.gBrowser.currentURI.host);
+        let url = encodeURIComponent(gBrowser.currentURI.host);
         url = `https://www.google.com/search?q=site:${url} ${sel}`;
         KeyChanger.openCommand(url);
     }
 };
-keys['Alt+B'] = function(event) {//bing站内搜索
-    let sel = KeyChanger.getSelectedText(),
-        win = event.target.ownerGlobal;
+keys['Alt+N'] = function(event) {//bing站内搜索
+    let sel = KeyChanger.getSelectedText();
     if (!sel.length) {
-        sel = win.prompt(Services.locale.appLocaleAsBCP47.includes("zh-") ? '请输入搜索的关键词:' : 'Please input keyword:', '');
+        sel = prompt(Services.locale.appLocaleAsBCP47.startsWith("zh-") ? '请输入搜索的关键词:' : 'Please input keyword:', '');
     }
     if (sel) {
-        let url = encodeURIComponent(win.gBrowser.currentURI.host);
+        let url = encodeURIComponent(gBrowser.currentURI.host);
         url = `https://cn.bing.com/search?q=site:${url} ${sel}`;
         KeyChanger.openCommand(url);
     }
 };
-keys['Alt+I'] = function({target}) { //查看页面信息
-    target.ownerGlobal.BrowserPageInfo();
+keys['Alt+I'] = function() { //查看页面信息
+    // BrowserPageInfo();
+    BrowserCommands.pageInfo();
 };
 keys['Alt+Z'] = { //恢复关闭标签页
     oncommand: "internal",
     params: ['tab','undo']
 };
-keys['Ctrl+SHIFT+V'] = function(e) { //打开剪切板地址
+keys['Ctrl+Alt+V'] = function(e) { //打开剪切板地址
     let url = readFromClipboard();
     try {
         switchToTabHavingURI(url, true);
@@ -109,7 +108,7 @@ keys['Ctrl+SHIFT+V'] = function(e) { //打开剪切板地址
     //e.preventDefault();
     //e.stopPropagation();
 };
-keys['Alt+C'] = function() { //复制当前网页 Markdown 链接
+keys['Ctrl+Alt+C'] = function() { //复制当前网页 Markdown 链接
     const url = gBrowser.currentURI.spec;
     const title = gBrowser.contentTitle;
     KeyChanger.copy(`[${title}](${url})`);
