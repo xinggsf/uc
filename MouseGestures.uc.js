@@ -126,7 +126,7 @@
 		'LDR': {
 			name: '打开历史窗口(侧边栏)',
 			cmd(event) {
-				SidebarUI.toggle("viewHistorySidebar");
+				SidebarController.toggle("viewHistorySidebar");
 			}
 		},
 		'RDL': {
