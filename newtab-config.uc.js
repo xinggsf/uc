@@ -5,13 +5,12 @@
 // @include         main
 // @Shutdown        window.NewTabConfig.destroy();
 // @onlyonce
-// @compatibility   Firefox 136
+// @compatibility   Firefox 115+
 // @version         1.0.0
 // @homepageURL     https://github.com/benzBrake/FirefoxCustomize/tree/master/userChromeJS
 // ==/UserScript==
 
-const { AboutNewTab } = ChromeUtils.importESModule("resource:///modules/AboutNewTab.sys.mjs");
-
+// const { AboutNewTab } = ChromeUtils.importESModule("resource:///modules/AboutNewTab.sys.mjs");
 window.NewTabConfig = {
 	NEW_TAB_PATH: "browser.newtab.url",
 	init() {
@@ -35,3 +34,8 @@ window.NewTabConfig = {
 	}
 };
 window.NewTabConfig.init();
+
+/* 另一UC脚本的简易实现 -----------------------------
+if (Number(Services.appinfo.version.slice(0,3)) > 114) {
+	AboutNewTab.newTabURL = 'https://www.hao123.com/';
+} */
