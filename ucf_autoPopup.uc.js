@@ -9,7 +9,7 @@
 // ==/UserScript==
 (async (
     delay = 300,
-    hidedelay = 800, //禁用自动隐藏，设为 0
+    hidedelay = 990, //禁用自动隐藏，设为 0
     btnSelectors = [
         "#PanelUI-menu-button",
         "#library-button",
@@ -74,16 +74,28 @@
         this[e.type](e);
     },
     popuphidden({ target }) {
-        if (!this.prevBtn || target.localName === "tooltip") return;
-        this.popups.delete(target);
-        this.open_ = this.inMemu_ = this.popups.size > 0;
+        if (!this.prevBtn) return;
+		let mpp;
+        if (target.matches('menu,toolbarbutton')) {
+            mpp = target.menupopup;
+        } else if (target.matches('menupopup,panel')) {
+            mpp = target;
+        } else return;
+        this.popups.delete(mpp);
+        this.open_ = this.popups.size > 0;
     },
-    popupshown({ target }) {
-        if (!this.prevBtn || target.localName === "tooltip") return;
-		target.addEventListener("mouseenter", this, {once:true});
-		target.addEventListener("mouseout", this, {once:true});
+    popupshown({ target }) { //mpp.anchorNode
+        if (!this.prevBtn) return;
+		let mpp;
+        if (target.matches('menu,toolbarbutton')) {
+            mpp = target.menupopup;
+        } else if (target.matches('menupopup,panel')) {
+            mpp = target;
+        } else return;
+		mpp.addEventListener("mouseenter", this, {once:true});
+		mpp.addEventListener("mouseout", this, {once:true});
         this.open_ = true;
-        this.popups.add(target);
+        this.popups.add(mpp);
     },
     mouseenter() {  //只处理菜单事件
         this.inMemu_ = true;
@@ -111,6 +123,7 @@
         clearTimeout(this.hidetimer);
         this.hidetimer = setTimeout(() => {
             this.hidePopup();
+            this.inMemu_ = false;
             this.open_ = false;
             this.prevBtn = null;
         }, hidedelay);

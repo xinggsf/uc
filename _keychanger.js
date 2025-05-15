@@ -55,8 +55,12 @@ keys["Alt+F3"] = {//关闭其他标签页
     oncommand: "internal",
     params: ['tab','close','other']
 };
+keys['Alt+Z'] = { //恢复关闭标签页
+    oncommand: "internal",
+    params: ['tab','undo']
+};
 
-keys['Alt+F'] = function() { //显示或隐藏书签栏，自带按键 Ctrl+Shift+B，FX占用
+keys['Alt+F'] = function() { //FX占用。显示或隐藏书签栏，自带按键 Ctrl+Shift+B
     var bar = document.getElementById("PersonalToolbar");
     bar.collapsed = !bar.collapsed;
 };
@@ -83,14 +87,8 @@ keys['Alt+N'] = function(event) {//bing站内搜索
         KeyChanger.openCommand(url);
     }
 };
-keys['Alt+I'] = function() { //查看页面信息
-    // BrowserPageInfo();
-    BrowserCommands.pageInfo();
-};
-keys['Alt+Z'] = { //恢复关闭标签页
-    oncommand: "internal",
-    params: ['tab','undo']
-};
+// 查看页面信息 BrowserPageInfo();
+keys['Alt+I'] = 'BrowserCommands.pageInfo();';
 keys['Ctrl+Alt+V'] = function(e) { //打开剪切板地址
     let url = readFromClipboard();
     try {

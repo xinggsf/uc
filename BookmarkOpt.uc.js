@@ -20,7 +20,7 @@ userChromeJS.BookmarkOpt.enableToggleButton: 显示/隐藏书签工具栏按钮
 userChromeJS.BookmarkOpt.doubleClickToShow: 双击地址栏切换书签工具栏
 userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签工具栏的图标（书签，文件夹均可）添加书签
 */
-(function(css, imp, firstUpperCase, add_style, copy_text, $, create_el, add_events, remove_events) {
+(function(css, imp, firstUpperCase, add_style, copy_text, $, dom, add_events, remove_events) {
 	// Bug 1904909 PlacesUtils::GatherDataText and GatherDataHtml should not recurse into queries
 	PlacesUtils.nodeIsFolder ||= PlacesUtils.nodeIsFolderOrShortcut;
 	const NODEIS_T = ['bookmark', 'container', 'day', 'folder', 'historyContainer', 'host', 'query', 'separator', 'tagQuery'];
@@ -125,7 +125,6 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 	}];
 
 	let isMouseDown = false;
-
 	window.BookmarkOpt = {
 		items: [],
 		X_MAIN: '/content/browser.xhtml',
@@ -173,14 +172,14 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 					add_events(el,['mousedown','click'],this);
 					document.addEventListener('mouseup', this);
 				}
-				if (Services.prefs.getBoolPref("userChromeJS.BookmarkOpt.enableToggleButton", false)) { // && !CustomizableUI.getWidget(this.widgetID)?.forWindow(window)?.node
+				if (Services.prefs.getBoolPref("userChromeJS.BookmarkOpt.enableToggleButton", false) && !CustomizableUI.getWidget(this.widgetID)?.forWindow(window)?.node) {
 					CustomizableUI.createWidget({
 						id: this.widgetID,
 						removable: true,
 						defaultArea: CustomizableUI.AREA_NAVBAR,
 						type: "custom",
 						onBuild: (doc) => {
-							let btn = create_el('toolbarbutton', {
+							let btn = dom.toolbarbutton({
 								id: this.widgetID,
 								label: $L("toggle personalToolbar"),
 								tooltiptext: $L("toggle personalToolbar"),
@@ -198,7 +197,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 				const ins = $("placesContext_createBookmark");
 				for (const prop of PLACES_CONTEXT_ITEMS) {
 					prop.condition ||= 'normal';
-					const item = create_el('menuitem', prop);
+					const item = dom.menuitem(prop);
 					this.items.push(item);
 					const refNode = $(prop.insertBefore) || ins || el.firstChild;
 					if (!refNode.matches('.menuitem-iconic')) {
@@ -299,7 +298,7 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 			}
 		},
 		popupshowing({target,shiftKey,currentTarget}) {
-			const { document: doc } = target.ownerGlobal;
+			const doc = target.ownerDocument;
 			if (target.id === 'placesContext') {
 				const state = [],
 					triggerNode = currentTarget.triggerNode,
@@ -321,10 +320,10 @@ userChromeJS.BookmarkOpt.insertBookmarkByMiddleClickIconOnly: 中键点击书签
 				PLACES_POPUP_ITEMS.forEach(c => {
 					let item;
 					if (c.label) {
-						item = create_el('menuitem', c, doc);
+						item = dom.menuitem(c, doc);
 						item.classList.add('bmopt-panel');
 					} else {
-						item = create_el('menuseparator', {
+						item = dom.menuseparator({
 							'class': 'bmopt-separator'
 						}, doc);
 					}
@@ -537,24 +536,28 @@ function imp(name) {
 },
 (id, doc = document) => {
 	if (!id) return;
-	if (/[, \>\.\[\(]|^:/.test(id)) return doc.querySelector(id);
-	return doc.getElementById(id.startsWith("#") ? id.substring(1) : id);
+	if (/^:|[, >\.\[\(]/.test(id)) return doc.querySelector(id);
+	return doc.getElementById(id.replace(/^#/,""));
 },
-(type, props = {}, doc=document) => {
-	const el = doc.createXULElement(type);
-	for (let [key, value] of Object.entries(props)) {
-		if (key.startsWith('on') && typeof value === 'function') {
-			el.addEventListener(key.slice(2).toLocaleLowerCase(), value);
-		} else {
-			el.setAttribute(key, value);
+new Proxy({}, {
+	get(target, tag) {
+		return function(attrs, doc = document) {
+			const el = doc.createXULElement(tag);
+			if (attrs) for (const [key, value] of Object.entries(attrs)) {
+				if (typeof value == 'function') {
+					el.addEventListener(key.replace(/^on/,''), value);
+				} else {
+					el.setAttribute(key, value);
+				}
+			}
+			el.classList.add('bmopt');
+			if (tag === "menu" || tag === "menuitem") {
+				el.classList.add(tag + "-iconic");
+			}
+			return el;
 		}
 	}
-	el.classList.add('bmopt');
-	if (type === "menu" || type === "menuitem") {
-		el.classList.add(type + "-iconic");
-	}
-	return el;
-},
+}),
 (target, types, ...args) => Array.isArray(types) && types.forEach(t => target.addEventListener(t, ...args)),
 (target, types, ...args) => Array.isArray(types) && types.forEach(t => target.removeEventListener(t, ...args))
 );

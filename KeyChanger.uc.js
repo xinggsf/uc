@@ -17,7 +17,7 @@
 // @note           2022.06.03 新增 getSelctionText()，修增 saveFile 不存在
 // ==/UserScript==
 
-(function(INTERNAL_MAP, getURLSpecFromFile, loadText, _openTrustedLinkIn, $, $$) {
+(function(INTERNAL_MAP, getURLSpecFromFile, loadText, _openTrustedLinkIn, dom, $, $$) {
     const useScraptchpad = true;  // If the editor does not exist, use the code snippet shorthand, otherwise set the editor path
 
     window.KeyChanger = {
@@ -80,7 +80,7 @@
                 return this.alert('KeyChanger', 'Load error.');
             }
             $(this.KEYSETID)?.remove();
-            const keyset = $C("keyset", {id: this.KEYSETID});
+            const keyset = dom.keyset({id: this.KEYSETID});
 			keyset.appendChild(keys);
 
             const df = document.createDocumentFragment();
@@ -177,7 +177,7 @@
 						keycode = k.startsWith("VK_") ? k : "VK_" + k;
 					}
                 }
-                const elem = document.createXULElement('key');
+                const elem = dom.key();
                 if (modifiers !== '')
                     elem.setAttribute('modifiers', modifiers.slice(0, -1));
                 if (key)
@@ -188,15 +188,15 @@
                 const cmd = keys[n];
                 switch (typeof cmd) {
                 case 'function':
-                    elem.setAttribute('oncommand', '(' + cmd.toString() + ').call(this, event);');
+                    elem.setAttribute('oncommand', `(${cmd.toString()}).call(this,event);`);
                     break;
 				case 'object':
-					Object.keys(cmd).forEach((a) => {
-						if (a === 'oncommand' && cmd[a] === "internal") {
-                            cmd[a] = "KeyChanger.internalCommand(event);";
+					for (let [a, v] of Object.entries(cmd)) {
+						if (a === 'oncommand' && v === "internal") {
+                            v = "KeyChanger.internalCommand(event);";
 						}
-						elem.setAttribute(a, cmd[a]);
-					});
+						elem.setAttribute(a, v);
+					}
 					break;
 				default:
                     elem.setAttribute('oncommand', cmd);
@@ -206,7 +206,7 @@
             return dFrag;
         },
         createMenuitem() {
-            const menuitem = $C('menuitem', {
+            const menuitem = dom.menuitem({
                 'id': 'toolsbar_KeyChanger_rebuild',
                 'label': 'KeyChanger',
                 'tooltiptext': '左键：重载配置\n右键：编辑配置'
@@ -222,22 +222,14 @@
             });
             $('devToolsSeparator').before(menuitem);
         },
-        internalCommand(event) {
-            let params = event.target.getAttribute('params');
-            let cmd = this.internalParamsParse(params);
+        internalCommand({target}) {
+            const params = target.getAttribute('params').split(',');
+			const cmd = params.reduce((o,p) => o?.[p], INTERNAL_MAP);
             if (typeof cmd === "function") {
-                cmd.call(this, event);
+                cmd.call(this);
             } else {
-                this.log("Internal command is not complete or too long", params, cmd);
+                this.log("Internal command is not complete or too long! params:\n", params);
             }
-        },
-        internalParamsParse(params) {
-            let cmd = INTERNAL_MAP;
-            for (let k of params.split(',')) {
-                if (!cmd.hasOwnProperty(k)) return "";
-                cmd = cmd[k];
-            }
-            return cmd;
         },
         edit(aFile, lineNumber) {
             if (this.isBuilding) return;
@@ -406,22 +398,6 @@
         fstream.close();
         return data;
     }
-
-    function $C(tag, attrs={}, skipAttrs=[], doc=document) {
-        return $A(doc.createXULElement(tag), attrs, skipAttrs);
-    }
-
-    function $A(el, attrs, skipAttrs=[]) {
-        if (attrs) Object.keys(attrs).forEach(function(key) {
-            if (skipAttrs.includes(key)) return;
-            if (typeof attrs[key] === 'function') {
-                el.setAttribute(key, "(" + attrs[key].toString() + ").call(this, event);");
-            } else {
-                el.setAttribute(key, attrs[key]);
-            }
-        });
-        return el;
-    }
 })(
 {tab: {
     close: {
@@ -525,6 +501,21 @@ function(path) {
         return openUILinkIn(url, where, params);
     }
 })(),
+new Proxy({}, {
+	get(target, tag) {
+		return function(attrs, doc = document) {
+			const el = doc.createXULElement(tag);
+			if (attrs) for (let [key, value] of Object.entries(attrs)) {
+				if (typeof value == 'function') {
+					value = `(${value.toString()}).call(this,event);`;
+				}
+				el.setAttribute(key, value);
+			}
+			// attrs && Object.assign(el,attrs);
+			return el;
+		}
+	}
+}),
 (id, doc=document) => doc.getElementById(id),
 (css, doc=document) => doc.querySelectorAll(css)
 );
