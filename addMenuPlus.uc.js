@@ -1578,7 +1578,7 @@ else {
 
         function $(id, doc = document) {
             if (!id) return;
-            if (/[, \>\.\[\(]|^:/.test(id)) return doc.querySelector(id);
+            if (/[, >\.\[\(]|^:/.test(id)) return doc.querySelector(id);
             return doc.getElementById(id.startsWith("#") ? id.substring(1) : id);
         }
 
@@ -1777,14 +1777,7 @@ else {
         margin-inline-start: 8px;
         margin-inline-end: 8px;
     }`,
-    (function() {
-        //  fix for 92+ port Bug 1723723 - Switch JS consumers from getURLSpecFromFile to either getURLSpecFromActualFile or getURLSpecFromDir
-        const fph = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler);
-
-        return "getURLSpecFromFile" in fph ?
-            f => fph.getURLSpecFromFile(f) :
-            f => fph.getURLSpecFromActualFile(f);
-    })(),
+	f => Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler).getURLSpecFromActualFile(f),
     (function() {
         return "IOUtils" in window ? function(path) {
             let isCompleted = false, data = "";
@@ -1823,9 +1816,7 @@ else {
             return data;
         }
     })(),
-    function(v) {
-        return Services.vc.compare(Services.appinfo.version, v) >= 0;
-    },
+    v => Services.vc.compare(Services.appinfo.version, v) >= 0,
     function(mime) {
         const firefoxSupportedImageMimes = [
             'image/jpeg',
